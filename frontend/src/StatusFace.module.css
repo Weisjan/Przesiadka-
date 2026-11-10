@@ -1,0 +1,13 @@
+.face { flex: none; display: block; animation: settle 160ms ease-out; }
+.frame { opacity: .28; }
+.success { color: var(--ready); }
+.edge { color: var(--edge); }
+.missed, .unavailable { color: var(--missed); }
+.loading, .error { color: var(--slate); }
+.drop { opacity: .7; }
+.loading .eyes { animation: concentrate 1.4s ease-in-out infinite alternate; }
+@keyframes settle { from { opacity: .45; } to { opacity: 1; } }
+@keyframes concentrate { to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .face, .loading .eyes { animation: none; } }
+
+@media (max-width: 600px) { .face { width: 96px; height: 96px; } }

@@ -1,0 +1,29 @@
+:global(:root) { --paper: #F8FAFB; --ink: #172A36; --slate: #51616D; --ready: #006E63; --edge: #8B6200; --missed: #B13832; --line: #172a3629; color-scheme: light; font-family: Bahnschrift, 'Arial Nova', Arial, sans-serif; color: var(--ink); background: var(--paper); font-synthesis: none; }
+:global(*) { box-sizing: border-box; }
+:global(body) { margin: 0; -webkit-font-smoothing: antialiased; font-size: 16px; line-height: 1.5; }
+:global(button), :global(input), :global(select), :global(textarea) { font: inherit; color: inherit; }
+:global(button), :global(select), :global(input) { min-height: 48px; }
+:global(button) { border: 1px solid var(--slate); border-radius: 6px; background: transparent; padding: 10px 18px; cursor: pointer; font-weight: 500; }
+:global(button:hover:not(:disabled)) { background: #172a3609; }
+:global(button:disabled) { opacity: .5; cursor: default; }
+:global(input), :global(select), :global(textarea) { border: 1px solid var(--slate); border-radius: 6px; background: var(--paper); padding: 10px 12px; max-width: 100%; }
+:global(input[type='date']), :global(input[type='time']) { min-width: 0; }
+:global(input[type='range']) { padding: 0; }
+:global(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 4px; }
+:global(h1), :global(h2), :global(h3), :global(p) { margin-top: 0; }
+:global(h1), :global(h2), :global(h3) { line-height: 1.2; font-weight: 600; }
+:global(a) { color: inherit; }
+:global(time), :global(output) { font-variant-numeric: tabular-nums; }
+.page { max-width: 1440px; padding: 0 80px; margin: auto; }
+.header { height: 96px; display: flex; justify-content: space-between; align-items: center; gap: 24px; border-bottom: 1px solid var(--line); }
+.header > span { font-size: 14px; color: var(--slate); }
+.brand { font-size: 26px; font-weight: 600; letter-spacing: -1px; text-decoration: none; }
+.brand span { margin-left: 2px; font-weight: 400; }
+.separator { margin: 0 12px; opacity: .5; }
+.footer { margin-top: 80px; padding: 24px 0 32px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; color: var(--slate); font-size: 14px; }
+.footer p { margin: 0; }
+.footer button { margin-left: 12px; font-size: 14px; }
+.skip { position: absolute; top: -100px; left: 24px; padding: 12px; background: var(--paper); z-index: 5; }
+.skip:focus { top: 16px; }
+@media (max-width: 1100px) { .page { padding: 0 40px; } }
+@media (max-width: 600px) { .page { padding: 0 24px; } .header { height: 80px; gap: 12px; } .brand { font-size: 23px; } .header > span { font-size: 12px; text-align: right; max-width: 110px; } .separator { margin: 0 5px; } .footer { margin-top: 48px; } }
