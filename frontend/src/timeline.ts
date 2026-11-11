@@ -1,4 +1,4 @@
-import type { Evaluation, Scenario } from './types'
+import type { Evaluation, ScenarioInput } from './types'
 
 type EventKind = 'arrival' | 'departure' | 'ready' | 'alternative'
 
@@ -17,7 +17,7 @@ function instantKey(iso: string): string {
   return `${new Date(iso).toISOString().slice(0, 19)}.${fraction}Z`
 }
 
-export function timelineEvents(scenario: Scenario, result: Evaluation | null): TimelineEvent[] {
+export function timelineEvents(scenario: ScenarioInput, result: Evaluation | null): TimelineEvent[] {
   const source: { kind: EventKind; date: string; label: string; description: string; symbol: string }[] = [
     { kind: 'arrival', date: scenario.arrival_at, label: 'przyjazd', description: 'Planowany przyjazd', symbol: '●' },
     { kind: 'departure', date: scenario.departure_at, label: 'odjazd', description: 'Planowany odjazd', symbol: '○' },

@@ -4,7 +4,7 @@ import { request } from './api'
 import { calendarDate, clock, eventClock, fullDate, timeHints } from './dates'
 import { durationParts, markerLanes, timelineEvents } from './timeline'
 import { readEvaluation } from './types'
-import type { Evaluation, Scenario } from './types'
+import type { Evaluation, ScenarioInput } from './types'
 import StatusFace from './StatusFace'
 import type { FaceEmotion } from './StatusFace'
 import styles from './TransferAnalysis.module.css'
@@ -13,7 +13,7 @@ const emotions: Record<Evaluation['status'], FaceEmotion> = { 'Zdążysz': 'succ
 const minutes = (value: number) => new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 2 }).format(value)
 const durationText = (value: number) => { const parts = durationParts(value); return `${parts.amount} ${parts.unit}` }
 
-function Timeline({ scenario, result, maxDelay }: { scenario: Scenario; result: Evaluation | null; maxDelay: number }) {
+function Timeline({ scenario, result, maxDelay }: { scenario: ScenarioInput; result: Evaluation | null; maxDelay: number }) {
   const events = timelineEvents(scenario, result)
   const context = events.map(event => event.date)
   const rail = useRef<HTMLDivElement>(null)
@@ -77,10 +77,10 @@ function JourneyTime({ label, date, reference, context }: { label: string; date:
   </details>
 }
 
-export default function TransferAnalysis({ scenario }: { scenario: Scenario }) {
+export default function TransferAnalysis({ scenario }: { scenario: ScenarioInput }) {
   const [delay, setDelay] = useState(0)
   const [attempt, setAttempt] = useState(0)
-  const [response, setResponse] = useState<{ scenario: Scenario; delay: number; attempt: number; data?: Evaluation; error?: string } | null>(null)
+  const [response, setResponse] = useState<{ scenario: ScenarioInput; delay: number; attempt: number; data?: Evaluation; error?: string } | null>(null)
   const id = useId()
   const current = response?.scenario === scenario && response.delay === delay && response.attempt === attempt ? response : null
   const result = current?.data ?? null

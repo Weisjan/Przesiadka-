@@ -56,3 +56,27 @@
  .formActions > button { flex: 1; }
  .actions > button { flex: 1; padding-left: 10px; padding-right: 10px; }
 }
+
+.examples { margin-top: 32px; }
+.examples h2 { font-size: 20px; margin-bottom: 8px; }
+.examples > p { font-size: 14px; color: var(--slate); margin-bottom: 16px; }
+.exampleList { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.exampleList li { min-width: 0; }
+.exampleList button { display: flex; flex-direction: column; align-items: start; gap: 8px; width: 100%; height: 100%; padding: 16px 0 12px; border: 0; border-top: 1px solid var(--line); border-radius: 0; text-align: left; }
+.exampleList button:hover:not(:disabled) { background: transparent; }
+.exampleList button:hover strong { text-decoration: underline; text-underline-offset: 4px; }
+.exampleList button[aria-pressed='true'] { border-top-color: var(--ink); }
+.exampleList strong { font-size: 16px; font-weight: 600; }
+.exampleList span { font-size: 14px; font-weight: 400; color: var(--slate); }
+.exampleList .exampleAction { color: var(--ink); font-size: 13px; margin-top: auto; padding-top: 4px; }
+.demoBanner { display: flex; align-items: center; justify-content: space-between; gap: 16px 24px; padding: 20px 0; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+.demoBanner p { margin: 0; scroll-margin-top: 24px; }
+.demoBanner strong { font-weight: 600; }
+.demoBanner span { display: block; font-size: 13px; color: var(--slate); margin-top: 4px; }
+.demoBanner button { flex: none; font-size: 14px; }
+@media (max-width: 720px) {
+ .exampleList { grid-template-columns: 1fr; gap: 0; }
+ .exampleList button { position: relative; gap: 4px; padding: 12px 76px 12px 0; }
+ .exampleList .exampleAction { position: absolute; right: 0; top: 12px; margin: 0; }
+ .demoBanner { align-items: start; flex-direction: column; }
+}
