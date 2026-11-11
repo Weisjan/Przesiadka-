@@ -32,6 +32,7 @@ Real captures have not yet been added to this repository. Reserved screenshot sl
 - Show reachable, just-in-time and missed states, with Plan B or an explicit unavailable state.
 - Inspect timeline events for full dates and offsets; coincident events share one point, while nearby events remain distinct.
 - Use the responsive interface with loading, empty and error states, keyboard controls and reduced-motion support.
+- Explicitly import official static ZTM/SKM GTFS schedules and query them through a separate read-only backend API. The frontend schedule picker is not implemented.
 
 ## Tech Stack
 
@@ -47,6 +48,7 @@ Real captures have not yet been added to this repository. Reserved screenshot sl
 - [The FastAPI application](backend/app/main.py) registers CRUD and evaluation routes. SQLModel stores scenarios in `backend/data/scenarios.db`, created on startup. `PRZESIADKA_DATABASE_PATH` can override that location.
 - [TransferAnalysis](frontend/src/TransferAnalysis.tsx) sends time inputs to `POST /api/transfers/evaluate`. The frontend presents the response rather than calculating transfer outcomes.
 - [Demo examples](frontend/src/demoExamples.ts) contain fixed inputs without database identifiers. Selecting one reuses the analysis component and does not call the CRUD write endpoints.
+- [GTFS integration](docs/gtfs.md) uses a separate local SQLite database and explicit CLI imports. Startup and API requests never download feeds; transfer evaluation remains independent.
 
 ### API
 
@@ -59,6 +61,9 @@ Real captures have not yet been added to this repository. Reserved screenshot sl
 | PUT | `/api/scenarios/{scenario_id}` | Replace all editable scenario fields. |
 | DELETE | `/api/scenarios/{scenario_id}` | Delete a scenario; return HTTP 204. |
 | POST | `/api/transfers/evaluate` | Evaluate supplied times without reading or writing scenarios. |
+| GET | `/api/transit/sources` | Report GTFS source/import metadata and attribution. |
+| GET | `/api/transit/stops?query=...` | Search imported stops without merging operators. |
+| GET | `/api/transit/departures?stop_id=...&date=...` | List planned departures on a civil Warsaw date. |
 
 Evaluation accepts `arrival_at`, `departure_at`, `walking_minutes`, `delay_minutes` and `next_departures`. The response includes the margin, delay threshold, status, expected arrival at the stop and Plan B state. Invalid inputs return HTTP 422; missing scenarios return HTTP 404.
 
@@ -98,6 +103,17 @@ npm.cmd run dev
 
 Swagger UI (`/docs`) and ReDoc (`/redoc`) are disabled. The OpenAPI JSON is the available API reference. Stop each service with `Ctrl+C`.
 
+### Optional static GTFS import
+
+From `backend/`, run these sequentially:
+
+```powershell
+uv run python -m app.gtfs ztm
+uv run python -m app.gtfs skm
+```
+
+Archives and `transit.db` stay in ignored `backend/data/gtfs/`, separate from user scenarios. These are static schedules, not realtime feeds. See [GTFS documentation](docs/gtfs.md) for local-file imports, calendar semantics, limits and provider attribution, including the unresolved production-date metadata.
+
 ## Testing
 
 Run these blocks from the repository root after installing the existing dependencies.
@@ -110,7 +126,7 @@ $testTemp = Join-Path $env:TEMP ("przesiadka-tests-" + [guid]::NewGuid().ToStrin
 uv run python -m pytest --basetemp $testTemp
 ```
 
-Coverage includes CRUD, validation, persistence across application restarts, CORS, transfer boundaries, DST, midnight and evaluation without database access.
+Coverage includes CRUD, validation, persistence across application restarts, CORS, transfer boundaries, DST, midnight and evaluation without database access. Local GTFS fixtures also cover secure import, calendar variants, namespaces, rollback and read-only transit endpoints.
 
 ```powershell
 Set-Location .\frontend
@@ -143,4 +159,4 @@ Not implemented:
 
 - Commit browser end-to-end tests and add CI checks.
 - Add versioned database migrations and scenario import/export.
-- Support timetable-file imports with an explicit source and validity period.
+- Connect imported GTFS schedules to scenario creation after validating interchange pairs and walking times.

@@ -11,9 +11,11 @@ from sqlmodel import SQLModel, create_engine
 
 from .scenarios import router
 from .transfers import router as transfers_router
+from .gtfs.api import router as transit_router
+from .gtfs.sources import configured_path
 
 
-def create_app(database_path: Path | None = None) -> FastAPI:
+def create_app(database_path: Path | None = None, transit_database_path: Path | None = None) -> FastAPI:
     if database_path is None:
         database_path = Path(os.environ.get(
             "PRZESIADKA_DATABASE_PATH", str(Path(__file__).resolve().parents[1] / "data" / "scenarios.db")
@@ -32,6 +34,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
 
     app = FastAPI(title="Przesiadka+", docs_url=None, redoc_url=None, lifespan=lifespan)
     app.state.engine = engine
+    app.state.transit_database_path = transit_database_path or configured_path()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -40,6 +43,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     )
     app.include_router(router)
     app.include_router(transfers_router)
+    app.include_router(transit_router)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, error: RequestValidationError):

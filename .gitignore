@@ -226,3 +226,6 @@ secrets/
 *.key
 *.p12
 *.pfx
+
+# Downloaded static GTFS feeds and local transit database
+/backend/data/gtfs/
