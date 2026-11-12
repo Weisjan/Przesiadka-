@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .sources import GTFSError
 from .store import departures, search_stops, sources
+from .transfer_search import SearchError, TransferSearchInput, search_transfers, transfer_links
 
 router = APIRouter(prefix="/api/transit", tags=["transit"])
 
@@ -15,6 +16,26 @@ def database_path(request: Request) -> Path:
 
 
 Database = Annotated[Path, Depends(database_path)]
+
+
+@router.get("/transfer-links")
+def get_transfer_links(database: Database):
+    try:
+        return transfer_links(database)
+    except SearchError as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from error
+    except GTFSError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.post("/transfers/search")
+def post_transfer_search(data: TransferSearchInput, database: Database):
+    try:
+        return search_transfers(database, data)
+    except SearchError as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from error
+    except GTFSError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @router.get("/sources")

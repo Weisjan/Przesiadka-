@@ -33,6 +33,7 @@ Real captures have not yet been added to this repository. Reserved screenshot sl
 - Inspect timeline events for full dates and offsets; coincident events share one point, while nearby events remain distinct.
 - Use the responsive interface with loading, empty and error states, keyboard controls and reduced-motion support.
 - Explicitly import official static ZTM/SKM GTFS schedules and query them through a separate read-only backend API. The frontend schedule picker is not implemented.
+- Evaluate imported SKM arrivals against ZTM departures for one explicit interchange: Gdańsk Główny SKM → Dworzec Główny 01 ZTM, with a user-estimated walking time and strict route-variant matching.
 
 ## Tech Stack
 
@@ -64,6 +65,8 @@ Real captures have not yet been added to this repository. Reserved screenshot sl
 | GET | `/api/transit/sources` | Report GTFS source/import metadata and attribution. |
 | GET | `/api/transit/stops?query=...` | Search imported stops without merging operators. |
 | GET | `/api/transit/departures?stop_id=...&date=...` | List planned departures on a civil Warsaw date. |
+| GET | `/api/transit/transfer-links` | Describe the single explicit stop pair and unverified walking assumption. |
+| POST | `/api/transit/transfers/search` | Search and evaluate planned transfers using an arriving trip's service date. |
 
 Evaluation accepts `arrival_at`, `departure_at`, `walking_minutes`, `delay_minutes` and `next_departures`. The response includes the margin, delay threshold, status, expected arrival at the stop and Plan B state. Invalid inputs return HTTP 422; missing scenarios return HTTP 404.
 
@@ -148,7 +151,7 @@ Frontend unit tests cover Warsaw time conversion, fixed demo inputs, timeline ev
 
 ## Limitations
 
-- No live transport feeds, route discovery or timetable verification. All calculations depend on supplied schedules and walking times.
+- No live transport feeds, network-wide routing or verified walking paths. The GTFS search covers one explicit stop pair; all calculations depend on supplied schedules and walking times.
 - Outcomes are deterministic time comparisons, not probability estimates or guarantees that a connection will be held.
 - Local, unauthenticated MVP: no user accounts, access control or production deployment setup. The frontend API origin is fixed to `http://127.0.0.1:8000`; CORS allows only the two configured localhost origins on port 5173.
 - SQLite tables are created automatically, but schema migrations are not implemented. Saved scenarios accept at most 100 strictly increasing later departures and an integer walking time from 0 to 1440 min.

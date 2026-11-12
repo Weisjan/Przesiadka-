@@ -127,6 +127,48 @@ def search_stops(path: Path, query: str, limit: int) -> list[dict]:
         return [stop_data(row) for row in rows]
 
 
+def stop_departures(connection: sqlite3.Connection, stop, metadata: dict,
+                    start: datetime, end: datetime, limit: int, route_id: str | None = None) -> list[dict]:
+    """Bounded UTC interval; retain service dates and GTFS extended times."""
+    first_service = date.fromisoformat(metadata["service_start_date"]).toordinal()
+    last_service = date.fromisoformat(metadata["service_end_date"]).toordinal()
+    max_days = metadata["max_departure_seconds"] // 86400 + 1
+    first = max(first_service, start.astimezone(WARSAW).date().toordinal() - max_days)
+    last = min(last_service, end.astimezone(WARSAW).date().toordinal() + 1)
+    items = []
+    for ordinal in range(first, last + 1):
+        service_day = date.fromordinal(ordinal)
+        anchor = service_anchor(service_day)
+        lower = max(0, math.ceil((start - anchor).total_seconds()))
+        upper = math.ceil((end - anchor).total_seconds())
+        rows = connection.execute("""
+          SELECT st.*,t.id AS trip_id,t.service_id,t.headsign AS trip_headsign,t.direction_id,
+                 r.id AS route_id,r.short_name,r.long_name
+          FROM gtfs_stop_times st JOIN gtfs_trips t ON t.id=st.trip_id
+          JOIN gtfs_routes r ON r.id=t.route_id JOIN gtfs_services c ON c.id=t.service_id
+          LEFT JOIN gtfs_exceptions e ON e.service_id=t.service_id AND e.date=?
+          WHERE st.stop_id=? AND st.departure_seconds>=? AND st.departure_seconds<? AND st.pickup_type<>1
+            AND (? IS NULL OR t.route_id=?)
+            AND (e.exception_type=1 OR (e.exception_type IS NULL AND c.start_date<=? AND c.end_date>=? AND c.days & ? <> 0))
+          ORDER BY st.departure_seconds,t.id,st.stop_sequence LIMIT ?
+        """, (service_day.isoformat(), stop["id"], lower, upper, route_id, route_id,
+              service_day.isoformat(), service_day.isoformat(), 1 << service_day.weekday(), limit + 1)).fetchall()
+        for row in rows:
+            departure = service_datetime(service_day, row["departure_seconds"])
+            items.append({
+                "operator": stop["operator"], "operator_name": SOURCES[stop["operator"]].name,
+                "stop_id": stop["id"], "stop_name": stop["name"], "route_id": row["route_id"],
+                "line": row["short_name"] or row["long_name"], "direction": row["headsign"] or row["trip_headsign"] or None,
+                "direction_id": row["direction_id"], "trip_id": row["trip_id"], "service_id": row["service_id"],
+                "service_date": service_day.isoformat(), "stop_sequence": row["stop_sequence"],
+                "gtfs_departure_time": row["departure_time"], "departure_at": departure.isoformat(),
+                "arrival_at": service_datetime(service_day, row["arrival_seconds"]).isoformat() if row["arrival_seconds"] is not None else None,
+                "pickup_type": row["pickup_type"], "drop_off_type": row["drop_off_type"],
+            })
+    items.sort(key=lambda item: (datetime.fromisoformat(item["departure_at"]).astimezone(timezone.utc), item["trip_id"], item["stop_sequence"]))
+    return items[:limit + 1]
+
+
 def departures(path: Path, stop_id: str, day: date, limit: int) -> dict | None:
     with read_connection(path) as connection:
         stop = connection.execute("SELECT * FROM gtfs_stops WHERE id=?", (stop_id,)).fetchone()
@@ -135,46 +177,17 @@ def departures(path: Path, stop_id: str, day: date, limit: int) -> dict | None:
         metadata = json.loads(connection.execute("SELECT metadata FROM gtfs_sources WHERE operator=?", (stop["operator"],)).fetchone()[0])
         result = {"is_realtime": False, "date": day.isoformat(), "timezone": "Europe/Warsaw", "source": metadata,
                   "stop": stop_data(stop), "departures": [], "limit": limit, "has_more": False}
-        # Calendar bounds are service days; 24+ times can spill beyond the last one.
         ordinal = day.toordinal()
-        max_days = metadata["max_departure_seconds"] // 86400 + 1
-        first_service = date.fromisoformat(metadata["service_start_date"]).toordinal()
-        last_service = date.fromisoformat(metadata["service_end_date"]).toordinal()
-        if ordinal < first_service - 1 or ordinal > last_service + max_days:
+        first = date.fromisoformat(metadata["service_start_date"]).toordinal()
+        last = date.fromisoformat(metadata["service_end_date"]).toordinal()
+        if ordinal < first - 1 or ordinal > last + metadata["max_departure_seconds"] // 86400 + 1:
             return result
         day_start = datetime.combine(day, time.min, WARSAW).astimezone(timezone.utc)
-        next_day = date.fromordinal(ordinal + 1)
+        if day == date.max:
+            return result
+        next_day = day + timedelta(days=1)
         day_end = datetime.combine(next_day, time.min, WARSAW).astimezone(timezone.utc)
-        items = []
-        for service_ordinal in range(max(first_service, ordinal - max_days), min(last_service, ordinal + 1) + 1):
-            service_day = date.fromordinal(service_ordinal)
-            anchor = service_anchor(service_day)
-            lower = max(0, math.ceil((day_start - anchor).total_seconds()))
-            upper = math.ceil((day_end - anchor).total_seconds())
-            rows = connection.execute("""
-              SELECT st.*,t.id AS trip_id,t.service_id,t.headsign AS trip_headsign,t.direction_id,
-                     r.id AS route_id,r.short_name,r.long_name
-              FROM gtfs_stop_times st JOIN gtfs_trips t ON t.id=st.trip_id
-              JOIN gtfs_routes r ON r.id=t.route_id JOIN gtfs_services c ON c.id=t.service_id
-              LEFT JOIN gtfs_exceptions e ON e.service_id=t.service_id AND e.date=?
-              WHERE st.stop_id=? AND st.departure_seconds>=? AND st.departure_seconds<? AND st.pickup_type<>1
-                AND (e.exception_type=1 OR (e.exception_type IS NULL AND c.start_date<=? AND c.end_date>=? AND c.days & ? <> 0))
-              ORDER BY st.departure_seconds,t.id,st.stop_sequence LIMIT ?
-            """, (service_day.isoformat(), stop_id, lower, upper, service_day.isoformat(), service_day.isoformat(), 1 << service_day.weekday(), limit + 1)).fetchall()
-            for row in rows:
-                departure = service_datetime(service_day, row["departure_seconds"])
-                items.append({
-                    "operator": stop["operator"], "operator_name": SOURCES[stop["operator"]].name,
-                    "stop_id": stop_id, "stop_name": stop["name"], "route_id": row["route_id"],
-                    "line": row["short_name"] or row["long_name"], "direction": row["headsign"] or row["trip_headsign"] or None,
-                    "direction_id": row["direction_id"], "trip_id": row["trip_id"], "service_id": row["service_id"],
-                    "service_date": service_day.isoformat(), "stop_sequence": row["stop_sequence"],
-                    "gtfs_departure_time": row["departure_time"], "departure_at": departure.isoformat(),
-                    "arrival_at": service_datetime(service_day, row["arrival_seconds"]).isoformat() if row["arrival_seconds"] is not None else None,
-                    "pickup_type": row["pickup_type"], "drop_off_type": row["drop_off_type"],
-                    "_instant": departure.astimezone(timezone.utc),
-                })
-        items.sort(key=lambda item: (item["_instant"], item["trip_id"], item["stop_sequence"]))
+        items = stop_departures(connection, stop, metadata, day_start, day_end, limit)
         result["has_more"] = len(items) > limit
-        result["departures"] = [{key: value for key, value in item.items() if key != "_instant"} for item in items[:limit]]
+        result["departures"] = items[:limit]
         return result
