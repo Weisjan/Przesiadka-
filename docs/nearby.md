@@ -1,0 +1,90 @@
+# Nearby GTFS stops and controlled walking imports
+
+Nearby discovery proposes **geographic candidates**, not validated interchange links. It uses only the imported GTFS database and the saved walking cache. It does not call ORS, change schedules, create transfer links or extend the current single-pair journey search/UI.
+
+## Discovery contract
+
+```text
+GET /api/transit/nearby-stops?stop_id=skm:7500&radius_m=500&limit=50
+```
+
+- `stop_id`: an exact namespaced `skm:` or `ztm:` ID. The origin must be a boarding stop (`location_type=0`) with valid coordinates.
+- `radius_m`: finite, greater than zero and at most 2000; default **500 metres**, inclusive at the boundary.
+- `limit`: integer 1–100; default 50. Results are ordered by distance, then ID. Selection uses bounded memory; discovery still scans the opposite operator's stops to count all candidates.
+- Only the **other operator's** boarding stops are considered. Same-name stops, individual ZTM poles and duplicate coordinates remain separate IDs. Stations, entrances and invalid coordinates are excluded and counted in `rejected`.
+- Haversine distance uses a mean Earth radius of 6,371,008.8 m. It is a straight-line filter, **never an inferred walking duration**.
+
+The response includes `stop`, `radius_m`, `distance_method`, `candidate_count` (all matches), `returned_count`, `limit`, `has_more`, `cache_hits`, `rejected`, `candidates` and `limitations`. Cache hits count fresh `available` and fresh `no_route` entries **among returned candidates**.
+
+Each candidate contains:
+
+| Field | Meaning |
+| --- | --- |
+| `from_stop_id`, `to_stop_id` | Directional, namespaced IDs. |
+| `from_stop`, `to_stop` | Operator/name, source ID, stop code/name, coordinates, `location_type` and `parent_station`. |
+| `straight_line_distance_m` | Haversine metres; not the ORS route distance. |
+| `has_saved_result` | A cache row exists, including stale/no-route results. |
+| `has_saved_walking_route` | A saved positive route exists; inspect `status` before using it. |
+| `status` | `missing`, `available`, `stale` or `no_route`. |
+| `walking_seconds`, `source`, `confidence` | Saved raw values, or null. Stale values are historical, not usable estimates. |
+| `estimate` | Saved metrics, coordinates, timestamps, expiry and attribution/license provenance, or null. |
+| `coordinates` | Current GTFS endpoints in `[longitude, latitude]` order. |
+
+Unknown origins return 404, invalid query/origin coordinates or non-boarding origins 422, and unavailable/corrupt databases 503. Reads never create a walking database. Reverse discovery reads the reverse cache pair independently.
+
+`location_type=0` does not prove a physical SKM platform is identified. These candidates require further review before being used as interchange links. There is no name-based merge or platform-to-platform claim.
+
+## Default dry-run CLI
+
+Run from the repository root:
+
+```powershell
+uv run --directory backend python -m app.walking.candidates skm:7500 --max-pairs 3 --max-requests 3
+```
+
+This command defaults to **dry-run**, requires no key and makes no network requests or database writes. `--dry-run` is also accepted explicitly. It prints the total/returned candidates, cache hits, selected IDs and coordinates, rejected counts, deferred pairs, planned initial requests and the request budget. `has_more_candidates` warns about discovery truncation; `deferred_pairs` counts pending returned candidates beyond `max-pairs`.
+
+Only `--execute` enables provider calls. For a deliberate one-pair execution, with the key already in the process environment:
+
+```powershell
+uv run --directory backend python -m app.walking.candidates skm:7500 --execute --max-pairs 1 --max-requests 1 --interval-seconds 2
+```
+
+This chooses the nearest pending candidate, not necessarily `ztm:2001`. Review the dry-run first. The original `python -m app.walking skm:7500 ztm:2001` command retains its original one-pair allowlist and behavior; the new module is a separate, controlled candidate importer.
+
+- `max-pairs` and `max-requests` each default to 3 and have hard limits **1–20**. Every actual attempt, including retries, consumes the global request budget. Retries can leave selected pairs unfinished; `remaining_selected_pairs` and `stopped_reason` identify this explicitly.
+- `interval-seconds` defaults to 2, range **1–60**; it spaces every attempt, including retries, using a monotonic clock. Existing transient-error backoff also applies.
+- Fresh positive and negative cache entries are skipped unless `--refresh` is explicit. Each successful result is committed independently, so rerunning resumes from saved pairs.
+- Any provider failure stops the batch. HTTP 429 or a `Retry-After` response is not replayed automatically. Resume manually after the provider's required interval/quota reset; do not repeatedly restart to evade it.
+- Limits apply to one process. Run imports sequentially: this is not an account-wide or cross-process quota manager.
+- `--radius-m`, `--limit`, `--transit-database` and `--database` control discovery and local paths. Defaults match the existing API configuration.
+- IDs/coordinates and budgets are printed **before** any provider request. The key stays in the Authorization header, read only from `ORS_API_KEY`; it is never printed or stored.
+
+No ORS calls run at FastAPI startup, in GET requests or on slider movements. No real ORS calls were made while implementing this extension.
+
+## Cache quality and attribution
+
+The existing [walking cache policy](walking.md#sqlite-and-freshness) remains unchanged: directional upserts, raw fractional seconds, `confidence=estimated`, source coordinates and provenance; 30-day positive/24-hour negative expiry. Any change to either GTFS coordinate invalidates the estimate immediately, even before expiry. A failed refresh preserves the old row. `no_route` has null metrics, never zero. Consumers needing integer minutes must round **up**, not down.
+
+Saved results retain `© openrouteservice by HeiGIT | Data from OpenStreetMap`, license/terms links and the terms review date. See [provider contract and reuse](walking.md#provider-contract-and-reuse) for CC BY-SA 4.0 obligations. Discovery distances are independent geometric calculations; they are not ORS results.
+
+## Local observation: 13 November 2026
+
+With the existing local imports, `skm:7500` yields **23 candidates within 500 m, 1 cache hit**. Some actual results:
+
+| Destination | GTFS name | Straight-line metres | Cache |
+| --- | --- | ---: | --- |
+| `ztm:2135` | Dworzec PKS 01 | 62.8 | missing |
+| `ztm:2136` | Dworzec PKS 02 | 68.1 | missing |
+| `ztm:1021` | Dworzec Główny 08 | 75.9 | missing |
+| `ztm:1023` | Dworzec Główny 06 | 89.0 | missing |
+| `ztm:1257` | Dworzec PKS 03 | 93.0 | missing |
+| `ztm:2001` | Dworzec Główny 01 | 147.5 | available |
+
+The existing `skm:7500 → ztm:2001` row still reads **213.5 walking metres / 153.7 seconds** (3 minutes rounded up), source `openrouteservice`, confidence `estimated`. This was a read of the previously saved result, not a new provider call or physical route validation.
+
+The default dry-run selects three missing pairs, skips one fresh cache entry, defers 19 pending pairs and plans up to three initial requests within a three-attempt budget. **Actual ORS requests: zero.** These observations depend on the local feed/cache snapshot and expiry; they are not a current transport timetable guarantee.
+
+## Verification
+
+Run the [repository test commands](../README.md#testing). `backend/tests/test_nearby.py` uses isolated synthetic GTFS/walking databases and blocks external calls. It covers geographic boundaries, multiple poles/IDs, coordinate rejection, directional cache/freshness, GTFS coordinate changes, read-only API errors, request budgets, rate limiting/retries, refresh, resume and secret-safe dry-runs. Existing walking tests cover provider response validation and persistence. Automated tests do not contact ORS.

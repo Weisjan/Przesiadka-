@@ -1,12 +1,13 @@
 from datetime import date as Date
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from ..models import WarsawDatetime
 
 from .sources import GTFSError
 from .store import departures, search_stops, sources
-from .transfer_search import SearchError, TransferSearchInput, search_transfers, transfer_links
+from .transfer_search import SearchError, TransferSearchInput, journeys, search_transfers, transfer_links
 
 router = APIRouter(prefix="/api/transit", tags=["transit"])
 
@@ -42,6 +43,23 @@ def post_transfer_search(data: TransferSearchInput, database: Database):
 def get_sources(database: Database):
     try:
         return {"is_realtime": False, "sources": sources(database)}
+    except GTFSError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.get("/journeys")
+def get_journeys(database: Database, leg: Literal["arrival", "departure"],
+                 date: str = Query(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"),
+                 limit: int = Query(default=2000, ge=1, le=2000),
+                 after: WarsawDatetime | None = Query(default=None)):
+    try:
+        day = Date.fromisoformat(date)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Podaj poprawną datę RRRR-MM-DD.") from error
+    try:
+        return journeys(database, leg, day, limit, after)
+    except SearchError as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from error
     except GTFSError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 

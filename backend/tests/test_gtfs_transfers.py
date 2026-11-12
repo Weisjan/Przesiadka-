@@ -326,3 +326,97 @@ def test_pattern_limit_rejects_instead_of_truncating(api, monkeypatch):
     response = api.post(PATH, json=REQUEST)
     assert response.status_code == 409
     assert response.json()["detail"]["code"] == "pattern_too_large"
+
+
+def test_selected_departure_is_exact_course_not_first_in_variant(api):
+    response = api.post(PATH, json={**REQUEST, "departure_trip_id": "ztm:b", "departure_service_date": "2026-11-12",
+                                    "departure_stop_sequence": 1, "delay_minutes": 20})
+    assert response.status_code == 200, response.text
+    result = response.json()["results"][0]
+    assert result["departure"]["trip_id"] == "ztm:b"
+    assert result["evaluation"]["margin_minutes"] == -2
+    assert result["plan_b"]["trip_id"] == "ztm:c"
+    assert response.json()["has_more"] is False
+
+
+@pytest.mark.parametrize("updates,status", [
+    ({"departure_service_date": "2026-11-12"}, 422),
+    ({"departure_stop_sequence": 1}, 422),
+    ({"departure_trip_id": "ztm:b", "departure_service_date": "2026-11-13"}, 422),
+    ({"departure_trip_id": "ztm:b", "departure_service_date": "2026-11-12", "departure_stop_sequence": 2}, 409),
+    ({"departure_trip_id": "ztm:b", "departure_service_date": 1794438000}, 422),
+])
+def test_exact_departure_validation(api, updates, status):
+    assert api.post(PATH, json={**REQUEST, **updates}).status_code == status
+
+
+@pytest.mark.parametrize("leg,stop,instant", [("arrival", "skm:7500", "2026-11-12T17:42:00+01:00"),
+                                           ("departure", "ztm:2001", "2026-11-12T17:51:00+01:00")])
+def test_picker_journeys_are_real_events_for_the_fixed_link(api, leg, stop, instant):
+    database = api.app.state.transit_database_path
+    before = database.read_bytes()
+    response = api.get("/api/transit/journeys", params={"leg": leg, "date": "2026-11-12", "limit": 1})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_realtime"] is False and data["realtime_delay"] is None
+    assert data["journeys"][0][f"{leg}_at"] == instant
+    assert data["journeys"][0]["stop_id"] == stop
+    assert data["journeys"][0]["service_date"] == "2026-11-12"
+    assert data["journeys"][0]["route_type"] in (2, 3)
+    assert data["has_more"] is (leg == "departure")
+    assert database.read_bytes() == before
+
+
+@pytest.mark.parametrize("query", [
+    {"leg": "unknown", "date": "2026-11-12"}, {"leg": "arrival", "date": "2026-02-30"},
+    {"leg": "arrival", "date": "2027-01-01"}, {"leg": "arrival", "date": "2026-11-12", "limit": 2001},
+    {"leg": "arrival", "date": "2026-11-12", "limit": 0},
+])
+def test_picker_query_validation(api, query):
+    assert api.get("/api/transit/journeys", params=query).status_code == 422
+
+
+def test_arrival_picker_keeps_gtfs_service_day_after_midnight(tmp_path, setup_feed):
+    database = setup_feed(skm=files("skm", arrival="24:42:00"))
+    with TestClient(create_app(tmp_path / "user.db", database)) as client:
+        response = client.get("/api/transit/journeys", params={"leg": "arrival", "date": "2026-11-13"})
+        assert response.status_code == 200
+        item = response.json()["journeys"][0]
+        assert item["service_date"] == "2026-11-12"
+        assert item["arrival_at"] == "2026-11-13T00:42:00+01:00"
+        assert item["gtfs_arrival_time"] == "24:42:00"
+
+
+def test_missing_departure_time_does_not_hide_a_known_arrival(tmp_path, setup_feed):
+    skm = files("skm")
+    skm["stop_times.txt"] = skm["stop_times.txt"].replace("a,17:42:00,17:43:00,", "a,17:42:00,,")
+    with TestClient(create_app(tmp_path / "user.db", setup_feed(skm=skm))) as client:
+        data = client.get("/api/transit/journeys", params={"leg": "arrival", "date": "2026-11-12"}).json()
+        assert data["journeys"][0]["arrival_at"] == "2026-11-12T17:42:00+01:00"
+        assert data["journeys"][0]["departure_at"] is None
+
+
+@pytest.mark.parametrize("day,expected", [("2026-03-29", "2026-03-29T01:58:00+01:00"),
+                                        ("2026-10-25", "2026-10-25T02:58:00+01:00")])
+def test_arrival_picker_dst_uses_same_gtfs_semantics(tmp_path, setup_feed, day, expected):
+    skm = files("skm", arrival="02:58:00")
+    skm["calendar.txt"] = skm["calendar.txt"].replace("1,1,1,1,1,0,0", "1,1,1,1,1,1,1")
+    with TestClient(create_app(tmp_path / "user.db", setup_feed(skm=skm))) as client:
+        response = client.get("/api/transit/journeys", params={"leg": "arrival", "date": day})
+        assert response.status_code == 200
+        assert response.json()["journeys"][0]["arrival_at"] == expected
+
+
+def test_departure_picker_respects_arriving_context(api):
+    response = api.get("/api/transit/journeys", params={"leg": "departure", "date": "2026-11-12", "after": "2026-11-12T17:55:00+01:00"})
+    assert response.status_code == 200
+    assert [item["trip_id"] for item in response.json()["journeys"]] == ["ztm:b", "ztm:c"]
+    response = api.get("/api/transit/journeys", params={"leg": "departure", "date": "2026-11-13", "after": "2026-11-12T17:55:00+01:00"})
+    assert response.status_code == 200 and response.json()["journeys"] == []
+
+
+@pytest.mark.parametrize("leg,after", [("arrival", "2026-11-12T17:55:00+01:00"), ("departure", "2026-03-29T02:30:00+01:00"),
+                                     ("departure", "2026-11-12T17:55:00"), ("departure", "2026-11-12T17:55:00+02:00"),
+                                     ("departure", "9999-12-31T23:59:00+01:00"), ("departure", "2027-01-01T01:00:00+01:00")])
+def test_picker_context_validation(api, leg, after):
+    assert api.get("/api/transit/journeys", params={"leg": leg, "date": "2026-11-12", "after": after}).status_code == 422

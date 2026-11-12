@@ -2,11 +2,13 @@
 
 A local MVP for checking whether a public transport transfer in Gdańsk remains reachable when the arriving service is delayed. It compares scheduled times, walking time and a simulated delay, then identifies a later departure when the original connection is missed.
 
-The interface is in Polish. Quiet Precision combines large departure times, an interactive timeline and a pixel-art status face.
+The interface is in Polish. Dark Transit uses two journey cards, large scheduled times and an animated SVG figure. Transfer details include a timeline and Plan B.
+
+The main **Rozkłady** view selects real journeys from locally imported GTFS data for one explicit pair: SKM Gdańsk Główny → ZTM Dworzec Główny 01. Choose the arriving and departing courses. Walking time can come from a saved OpenRouteService estimate or your own manual input. No verified realtime source is connected; delay starts at zero and remains an explicitly labeled simulation.
 
 ## Demo
 
-Start both services and choose an example under **Wypróbuj przykład**. Move the delay slider to update the margin, status, timeline and Plan B.
+Start both services, open **Scenariusze** and choose an example under **Wypróbuj przykład**. Move the delay slider to update the margin, status, timeline and Plan B. These examples remain separate from the real GTFS view and from saved scenarios.
 
 | Example | Schedule | Try |
 | --- | --- | --- |
@@ -18,11 +20,13 @@ These are **fictional demonstration scenarios**, fixed to 10–11 November 2026 
 
 ### Screenshots
 
-Real captures have not yet been added to this repository. Reserved screenshot slots:
+Real browser captures from the local GTFS import, for service date **12 November 2026**. Walking time is a user-supplied estimate of 5 minutes. These captures show a fixed schedule snapshot, not live transport information.
 
-- [ ] Desktop: transfer analysis with an 8 min delay and Plan B at 18:03.
-- [ ] Mobile: the shared arrival/departure point at zero margin.
-- [ ] Midnight: the last-course example with no alternative.
+| View | Capture |
+| --- | --- |
+| Desktop, 1440 px, zero margin at simulated delay +8 min | [Open screenshot](docs/screenshots/dark-transit-desktop.png) |
+| Mobile, 390 px, the same transfer | [Open screenshot](docs/screenshots/dark-transit-mobile.png) |
+| Missed connection at +10 min, with Plan B at 17:55 | [Open screenshot](docs/screenshots/dark-transit-plan-b.png) |
 
 ## Features
 
@@ -32,7 +36,7 @@ Real captures have not yet been added to this repository. Reserved screenshot sl
 - Show reachable, just-in-time and missed states, with Plan B or an explicit unavailable state.
 - Inspect timeline events for full dates and offsets; coincident events share one point, while nearby events remain distinct.
 - Use the responsive interface with loading, empty and error states, keyboard controls and reduced-motion support.
-- Explicitly import official static ZTM/SKM GTFS schedules and query them through a separate read-only backend API. The frontend schedule picker is not implemented.
+- Explicitly import official static ZTM/SKM GTFS schedules and select real arrivals/departures through the read-only API. Select line, direction, date and an exact scheduled course without entering IDs or times.
 - Evaluate imported SKM arrivals against ZTM departures for one explicit interchange: Gdańsk Główny SKM → Dworzec Główny 01 ZTM, with a user-estimated walking time and strict route-variant matching.
 
 ## Tech Stack
@@ -48,8 +52,10 @@ Real captures have not yet been added to this repository. Reserved screenshot sl
 - [Transfer logic](backend/app/transfer_logic.py) is a pure function with no HTTP or database dependencies.
 - [The FastAPI application](backend/app/main.py) registers CRUD and evaluation routes. SQLModel stores scenarios in `backend/data/scenarios.db`, created on startup. `PRZESIADKA_DATABASE_PATH` can override that location.
 - [TransferAnalysis](frontend/src/TransferAnalysis.tsx) sends time inputs to `POST /api/transfers/evaluate`. The frontend presents the response rather than calculating transfer outcomes.
+- [Transit](frontend/src/Transit.tsx) selects exact GTFS course occurrences, including service date and stop sequence, and calls the transfer search endpoint. The backend selects Plan B; React only presents the result. Manual delay survives retries and view changes, and resets to zero when a new course is chosen.
 - [Demo examples](frontend/src/demoExamples.ts) contain fixed inputs without database identifiers. Selecting one reuses the analysis component and does not call the CRUD write endpoints.
 - [GTFS integration](docs/gtfs.md) uses a separate local SQLite database and explicit CLI imports. Startup and API requests never download feeds; transfer evaluation remains independent.
+- [Walking estimates](docs/walking.md) use an explicit ORS CLI and separate `backend/data/walking.db`. API reads use cached results; manual corrections take precedence. The key is only read from the CLI process environment.
 
 ### API
 
@@ -65,7 +71,10 @@ Real captures have not yet been added to this repository. Reserved screenshot sl
 | GET | `/api/transit/sources` | Report GTFS source/import metadata and attribution. |
 | GET | `/api/transit/stops?query=...` | Search imported stops without merging operators. |
 | GET | `/api/transit/departures?stop_id=...&date=...` | List planned departures on a civil Warsaw date. |
+| GET | `/api/transit/journeys?leg=arrival&date=...` | List scheduled arrivals for the fixed SKM stop; `leg=departure` lists the fixed ZTM stop. Optional `after` bounds departures to six hours after an arriving instant. |
 | GET | `/api/transit/transfer-links` | Describe the single explicit stop pair and unverified walking assumption. |
+| GET | `/api/transit/walking-transfers?from_stop_id=...&to_stop_id=...` | Read a saved directional walking estimate, including freshness, source and attribution; never call ORS. |
+| GET | `/api/transit/nearby-stops?stop_id=skm:7500&radius_m=500` | Discover opposite-operator geographic candidates and directional cache status; never call ORS or create transfer links. |
 | POST | `/api/transit/transfers/search` | Search and evaluate planned transfers using an arriving trip's service date. |
 
 Evaluation accepts `arrival_at`, `departure_at`, `walking_minutes`, `delay_minutes` and `next_departures`. The response includes the margin, delay threshold, status, expected arrival at the stop and Plan B state. Invalid inputs return HTTP 422; missing scenarios return HTTP 404.
@@ -88,7 +97,7 @@ uv sync --locked
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-No manual database setup, accounts or API keys are required. Saved scenarios remain in SQLite after the backend restarts.
+The core application requires no manual database setup, accounts or API keys. The optional ORS walking import needs `ORS_API_KEY` in that CLI process. Saved scenarios remain in SQLite after the backend restarts.
 
 ### Frontend
 
@@ -117,6 +126,30 @@ uv run python -m app.gtfs skm
 
 Archives and `transit.db` stay in ignored `backend/data/gtfs/`, separate from user scenarios. These are static schedules, not realtime feeds. See [GTFS documentation](docs/gtfs.md) for local-file imports, calendar semantics, limits and provider attribution, including the unresolved production-date metadata.
 
+### Optional saved walking estimate
+
+From `backend/`, preview the one supported pair without network access or writes:
+
+```powershell
+uv run python -m app.walking skm:7500 ztm:2001 --dry-run
+```
+
+With `ORS_API_KEY` already configured in the current terminal's environment, import explicitly:
+
+```powershell
+uv run python -m app.walking skm:7500 ztm:2001 --max-requests 1
+```
+
+Do not put the key in arguments, code, logs or Git. See [walking documentation](docs/walking.md) for secure prompting, cache/resume behavior, current CC BY-SA 4.0 attribution and limits. Automatic-fill tests use a clearly identified synthetic fixture. A later local read confirmed the previously imported real estimate; no provider request was made for that check.
+
+[Nearby-stop discovery](docs/nearby.md) adds a separate candidate importer that defaults to dry-run:
+
+```powershell
+uv run --directory backend python -m app.walking.candidates skm:7500 --max-pairs 3 --max-requests 3
+```
+
+Run this block from the repository root. Execution requires `--execute`; request budgets include retries. Geographic candidates do not expand the current single-pair journey planner or UI.
+
 ## Testing
 
 Run these blocks from the repository root after installing the existing dependencies.
@@ -138,7 +171,7 @@ npm.cmd run typecheck
 npm.cmd run build
 ```
 
-Frontend unit tests cover Warsaw time conversion, fixed demo inputs, timeline event grouping, close timestamps and API response validation. The build script also runs the typecheck. There is no committed browser end-to-end suite.
+Frontend unit tests cover Warsaw time conversion, fixed demo inputs, timeline event grouping, close timestamps, exact GTFS course identity, response validation and readable API errors. The build script also runs the typecheck. There is no committed browser end-to-end suite. The screenshots above were captured during a separate Playwright/Edge smoke check against the local import and an isolated scenario database; that check is not part of `npm test`.
 
 ## Engineering Decisions
 
@@ -147,6 +180,7 @@ Frontend unit tests cover Warsaw time conversion, fixed demo inputs, timeline ev
 - **Transfer boundaries:** `margin = departure − (arrival + delay + walking)`. Positive means `Zdążysz`, zero means `Na styk`, and negative means `Nie zdążysz`. The threshold is the margin at zero delay; non-positive thresholds indicate no safe initial margin.
 - **Plan B:** only a missed connection needs an alternative. The backend chooses the earliest supplied later departure at or after the expected arrival at the stop. Candidates must belong to the same departing line and direction; the application does not search a transport network.
 - **Asynchronous UI:** analysis requests are debounced by 150 ms. Cleanup aborts superseded requests, and a disposal guard ignores late responses. Results are matched to the current scenario, delay and retry attempt.
+- **GTFS selection:** civil picker dates are kept separate from each course's service date. Search identifies an exact departure by trip ID, service date and stop sequence. No frontend timetable arithmetic chooses an alternative. Structured 409/422 errors remain readable; changing a direction or date clears the modal's old selection.
 - **Accessibility:** labeled native controls, modal focus handling, visible keyboard focus and live status text accompany the visual result. Color is not the only status cue. CSS respects `prefers-reduced-motion`.
 
 ## Limitations
@@ -162,4 +196,5 @@ Not implemented:
 
 - Commit browser end-to-end tests and add CI checks.
 - Add versioned database migrations and scenario import/export.
-- Connect imported GTFS schedules to scenario creation after validating interchange pairs and walking times.
+- Measure and document platform-specific walking paths before marking any walking time as verified.
+- Add further explicit interchange pairs and investigate a separately validated realtime source with reliable trip matching.

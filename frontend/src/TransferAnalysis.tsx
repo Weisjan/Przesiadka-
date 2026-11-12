@@ -13,7 +13,8 @@ const emotions: Record<Evaluation['status'], FaceEmotion> = { 'Zdążysz': 'succ
 const minutes = (value: number) => new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 2 }).format(value)
 const durationText = (value: number) => { const parts = durationParts(value); return `${parts.amount} ${parts.unit}` }
 
-function Timeline({ scenario, result, maxDelay }: { scenario: ScenarioInput; result: Evaluation | null; maxDelay: number }) {
+export function Timeline({ scenario, result, maxDelay }: { scenario: ScenarioInput; result: Evaluation | null; maxDelay: number }) {
+  const title = useId()
   const events = timelineEvents(scenario, result)
   const context = events.map(event => event.date)
   const rail = useRef<HTMLDivElement>(null)
@@ -35,8 +36,8 @@ function Timeline({ scenario, result, maxDelay }: { scenario: ScenarioInput; res
   const color = result ? styles[emotions[result.status]] : ''
   const ready = result ? position(result.expected_stop_arrival_at) : 0
   const departure = position(scenario.departure_at)
-  return <section className={`${styles.timeline} ${color}`} aria-labelledby="timeline-title">
-    <div className={styles.timelineHeading}><h2 id="timeline-title">Oś przesiadki</h2><span>Dojście {scenario.walking_minutes} min</span></div>
+  return <section className={`${styles.timeline} ${color}`} aria-labelledby={title}>
+    <div className={styles.timelineHeading}><h2 id={title}>Oś przesiadki</h2><span>Dojście {scenario.walking_minutes} min</span></div>
     <div ref={rail} className={styles.rail} style={{ height: 96 + Math.max(0, ...lanes) * 28 }} aria-hidden="true">
       <div className={styles.track} />
       {result && <div className={styles.marginTrack} style={{ left: `${Math.min(ready, departure)}%`, width: `${Math.abs(departure - ready)}%` }} />}

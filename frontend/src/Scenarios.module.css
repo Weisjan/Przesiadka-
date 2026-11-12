@@ -3,7 +3,7 @@
 .selector { display: grid; gap: 8px; font-size: 14px; color: var(--slate); width: min(440px, 100%); }
 .selector select { font-size: 16px; color: var(--ink); width: 100%; }
 .primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.primary:hover:not(:disabled) { background: #294454; }
+.primary:hover:not(:disabled) { background: #dbddd8; }
 .notice { min-height: 24px; margin: 12px 0 16px; color: var(--ready); font-size: 14px; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
 .danger { color: var(--missed); border-color: var(--missed); }

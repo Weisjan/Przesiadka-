@@ -1,6 +1,6 @@
 # Static GTFS integration
 
-This backend extension imports official timetable ZIP files explicitly. It does not fetch feeds during FastAPI startup or API requests, provide realtime information, or change the transfer evaluation algorithm. The frontend still uses saved scenarios and the three fictional demos.
+This extension imports official timetable ZIP files explicitly. It does not fetch feeds during FastAPI startup or API requests, provide realtime information, or change the transfer evaluation algorithm. The frontend's main view selects real GTFS journeys for the explicit interchange below; saved scenarios and the three fictional demos remain in the separate Scenariusze view.
 
 ## Sources and reuse conditions
 
@@ -91,6 +91,7 @@ Start the backend with the existing README command. No import occurs on startup.
 | `GET /api/transit/sources` | Both configured providers, import availability, provenance, attribution and service-date bounds. Works before the first import. |
 | `GET /api/transit/stops?query=glowny&limit=50` | Accent-insensitive substring search, keeping each provider's stops separate. Default limit 50, maximum 100. |
 | `GET /api/transit/departures?stop_id=skm:7500&date=2026-11-11&limit=50` | Planned departures on the given civil date. Default limit 50, maximum 200; `has_more` reports truncation. |
+| `GET /api/transit/journeys?leg=arrival&date=2026-11-12` | Actual scheduled arrivals at the explicit SKM stop, or ZTM departures with `leg=departure`. Default/maximum limit 2,000; `has_more` reports truncation. Optional Warsaw-offset `after` limits departures to the intersection of the civil date and the next six elapsed hours. |
 
 All envelopes contain `is_realtime: false`. Stops/departures return 503 if the transit database is absent or invalid, unknown stops return 404, and invalid query parameters return 422. The OpenAPI schema describes the query parameters. No transit write/import endpoint is exposed.
 
@@ -120,7 +121,7 @@ The same query also returned a `24:15:00` departure belonging to service date **
 - ZIP: at most 64 root-level members, 512 MiB expanded total, 256 MiB per member, compression ratio at most 200, central directory at most 1 MiB. Stored/deflate compression only. Paths, links, duplicate names, encrypted entries, ZIP64 and multipart archives are rejected. Files are streamed, never extracted to disk.
 - CSV: strict UTF-8/UTF-8 BOM and header/column checks; at most 4 million rows per file, 128 columns and 1,048,576 characters per physical line. Optional metadata files are limited to 1 MiB. IDs, coordinates, times, calendar values, foreign keys and trip chronology are validated.
 - Extended times through `167:59:59` are supported. Frequency-based schedules with nonempty `frequencies.txt` are rejected rather than presented as exact departures. Missing departure times are counted and omitted, without interpolation. Pickup type 1 is excluded; types 2/3 are returned as provided and may require prior arrangements.
-- Optional files outside the imported model are listed in `ignored_files`. The importer is not a full GTFS validator or journey planner. No automatic cross-provider walking links, live feeds, frontend schedule picker, refresh job or schema migrations are included.
+- Optional files outside the imported model are listed in `ignored_files`. The importer is not a full GTFS validator or network-wide journey planner. No automatic cross-provider walking links, live feeds, refresh job or schema migrations are included. The frontend picker supports only the explicit pair below.
 
 ## Verification
 
@@ -128,7 +129,7 @@ Use the backend and frontend test commands in [README](../README.md#testing). Te
 
 ## First interchange search
 
-This backend-only feature covers **Gdańsk Główny SKM → Dworzec Główny 01 ZTM**. It does not change saved scenarios, demos or the frontend. It neither downloads data nor writes to either database.
+This feature covers **Gdańsk Główny SKM → Dworzec Główny 01 ZTM**. Its read-only API and frontend do not change saved scenarios or demos, download feeds or write to either database.
 
 ### Stop audit and walking assumption
 
@@ -170,6 +171,8 @@ Stop 01 serves different routes and variants. For example, route `ztm:6`, `direc
 | `arrival_stop_sequence` | Optional exact occurrence if a trip visits `skm:7500` more than once; otherwise ambiguity returns 409. |
 | `departure_route_id` | Required namespaced ZTM route ID, not its display name. |
 | `departure_trip_id` | Optional reference trip selecting a downstream variant. This chooses a pattern, not the reference trip's service date. |
+| `departure_service_date` | Optional ISO service date. With `departure_trip_id`, select that exact departure rather than the first courses in its variant. An inactive, missing or out-of-window occurrence returns 422. |
+| `departure_stop_sequence` | Optional boarding occurrence, requiring `departure_trip_id`. Resolves a repeated visit on a trip. |
 | `walking_minutes` | Required integer 0–180; estimated by the caller. |
 | `delay_minutes` | Simulated delay 0–180, finite; default 0. No realtime delay is read. |
 | `window_minutes` | Elapsed search interval from the **scheduled SKM arrival**, 1–360 minutes; default 120. End is exclusive. |
@@ -244,3 +247,17 @@ For this same second result, delay 0 gives +8 minutes / `Zdążysz`; delay 8 giv
 Fixture tests cover these boundaries plus calendar-only/dates-only data, exceptions, weekends, 24+/25+ times, spring/fall DST, exact stop occurrences, route/direction/downstream/platform separation, missing data, no later course, bounded searches and no writes or network calls. Run the full regression using the README commands.
 
 Next step: measure and document the walking path from actual SKM platforms to ZTM stop 01 before labeling any walking time as verified or exposing the connection as platform-accurate.
+
+## Dark Transit frontend
+
+Open **Rozkłady** after importing both feeds and starting the backend/frontend. The two **Wybierz kurs / Zmień kurs** buttons open native modal dialogs. Operator and stop are limited to the supported pair. Lists come from `/journeys`, with SKM service-specific route IDs grouped under their supplied line name for selection. Each actual course keeps its exact route, trip, service date and stop sequence; identical display names never identify a transfer or Plan B.
+
+The picker date means a **civil arrival/departure date in Warsaw**. The backend resolves calendar exceptions, 24+ times and DST. Options retain the service date and show offset information for repeated autumn hours. The departure picker sends the chosen arrival as `after`, so it lists only courses within the supported six-hour window; choose the next date explicitly when crossing midnight. The final search still validates every selection against the database. A reimport that changes selected times requires choosing the course again instead of mixing card times and a newer evaluation.
+
+Walking time uses a fresh saved [OpenRouteService estimate](walking.md) when available; otherwise it starts **empty** and must be entered explicitly. It remains estimated and manually editable. Selecting actual scheduled courses never inserts scenarios. The delay slider starts at **0**, labeled **Brak danych o aktualnym opóźnieniu — symulacja**. Moving it marks **Ręczna korekta**; retries and returning from Scenariusze preserve that value. Choosing a new course starts a fresh zero-delay simulation; **Przywróć 0 min** is an explicit user action. Static GTFS supplies no realtime delay: `/journeys` exposes `realtime_delay: null`. A future realtime integration must separately establish trip/service-day matching, source and update time before setting an automatic value; no such adapter is implemented here.
+
+Both course lists and analysis requests abort superseded requests and ignore late responses. An analysis is displayed only for its complete current input, including course occurrences and the selected import's timestamps. The frontend uses the existing backend result for status, margin and Plan B; the SVG walking/running/stopped figure follows that status without redefining thresholds. `Na styk` therefore still means exactly zero margin.
+
+The main view uses the supplied dark palette, two journey cards and one central SVG figure. At 390 px the cards precede the figure and slider in one column. Dates/offsets, the existing timeline, Plan B and provider attribution remain available through disclosures. Native controls, explicit labels, modal focus wrapping and visible keyboard focus accompany `prefers-reduced-motion`. The old CRUD and all three fictional demos remain available under **Scenariusze**.
+
+The actual desktop/mobile captures are linked in the README. Verification used a locally cached GTFS import, a separate temporary scenario database and temporary server ports, with browser requests forwarded to that isolated backend. Failure-state checks deliberately injected error responses; the successful timetable results came from the real local backend. Browser checks were an ad-hoc Playwright/Edge run, not a committed or CI-managed end-to-end suite. Existing user-data and GTFS database hashes were checked for changes.
