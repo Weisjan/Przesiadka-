@@ -130,8 +130,9 @@ def save_result(path: Path, from_stop_id: str, to_stop_id: str, points, result: 
     return row
 
 
-def lookup(path: Path, transit: Path, from_stop_id: str, to_stop_id: str, now: datetime | None = None) -> dict:
-    points = stop_pair(transit, from_stop_id, to_stop_id)
+def lookup(path: Path, transit: Path, from_stop_id: str, to_stop_id: str, now: datetime | None = None,
+           *, points=None) -> dict:
+    points = stop_pair(transit, from_stop_id, to_stop_id) if points is None else points
     row = read_saved(path, from_stop_id, to_stop_id)
     if row is None:
         return {"status": "missing", "from_stop_id": from_stop_id, "to_stop_id": to_stop_id, "estimate": None}

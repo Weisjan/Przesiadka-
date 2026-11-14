@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { request } from './api'
 import { eventClock, fromIso, fullDate, timeHints } from './dates'
-import { directionKey, journeyKey, lineKey, readJourneys } from './transitData'
+import { directionKey, journeyKey, lineKey, readJourneys, stopLabel } from './transitData'
 import type { Journey, JourneysResponse, Leg, TransitSource, TransitStop } from './transitData'
 import styles from './Transit.module.css'
 
-export default function JourneyPicker({ leg, stop, source, selected, reference, onChoose, onClose }: {
-  leg: Leg; stop: TransitStop; source: TransitSource; selected: Journey | null; reference?: string
+export default function JourneyPicker({ leg, stop, source, selected, reference, linkId, onChoose, onClose }: {
+  leg: Leg; stop: TransitStop; source: TransitSource; selected: Journey | null; reference?: string; linkId: string
   onChoose: (journey: Journey) => void; onClose: () => void
 }) {
   const [day, setDay] = useState(() => fromIso((leg === 'arrival' ? selected?.arrival_at : selected?.departure_at) ?? reference ?? new Date().toISOString()).date)
@@ -17,7 +17,7 @@ export default function JourneyPicker({ leg, stop, source, selected, reference, 
   const [response, setResponse] = useState<{ key: string; data?: JourneysResponse; error?: string } | null>(null)
   const dialog = useRef<HTMLDialogElement>(null)
   const id = useId()
-  const query = new URLSearchParams({ leg, date: day })
+  const query = new URLSearchParams({ leg, date: day, link_id: linkId })
   if (leg === 'departure' && reference) query.set('after', reference)
   const queryString = query.toString()
   const key = `${queryString}:${attempt}`
@@ -32,6 +32,11 @@ export default function JourneyPicker({ leg, stop, source, selected, reference, 
   const choices = inLine.filter(item => directionKey(item) === direction)
   const chosen = choices.find(item => journeyKey(item) === course)
   const times = choices.map(item => (leg === 'arrival' ? item.arrival_at : item.departure_at)!)
+
+  useEffect(() => {
+    if (!line && lines.length === 1) setLine(lines[0][0])
+    if (!direction && directions.length === 1) setDirection(directions[0][0])
+  }, [data, line, direction])
 
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null
@@ -60,10 +65,9 @@ export default function JourneyPicker({ leg, stop, source, selected, reference, 
     }}>
     <div className={styles.pickerHeading}><div><p>{leg === 'arrival' ? 'Linia 1 / przyjazd' : 'Linia 2 / odjazd'}</p>
       <h2 id={`${id}-title`}>Wybierz kurs</h2></div><button onClick={onClose} aria-label="Zamknij wybór kursu">Zamknij</button></div>
-    <p className={styles.help}>Rozkład planowany. Obsługujemy wyłącznie SKM Gdańsk Główny → ZTM Dworzec Główny 01.</p>
+    <p className={styles.help}>Rozkład planowany · {stopLabel(stop)}.</p>
     {leg === 'departure' && reference && <p className={styles.help}>Odjazdy w ciągu 6 godzin od planowanego przyjazdu. Dla kursu po północy wybierz następną datę.</p>}
     <div className={styles.pickerGrid}>
-      <label>Operator<select value={stop.operator} onChange={() => {}}><option value={stop.operator}>{stop.operator === 'skm' ? 'SKM Trójmiasto' : 'ZTM Gdańsk'}</option></select></label>
       <label>Data {leg === 'arrival' ? 'przyjazdu' : 'odjazdu'}<input type="date" required value={day}
         min={source.service_start_date} max={source.service_end_date}
         onChange={event => { setDay(event.target.value); setLine(''); setDirection(''); setCourse('') }} /></label>
@@ -73,7 +77,6 @@ export default function JourneyPicker({ leg, stop, source, selected, reference, 
       <label>Kierunek<select value={direction} disabled={loading || !line} onChange={event => { setDirection(event.target.value); setCourse('') }}>
         <option value="">Wybierz kierunek</option>{directions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select></label>
-      <label className={styles.wide}>{leg === 'arrival' ? 'Stacja przyjazdu' : 'Przystanek odjazdu'}<select value={stop.stop_id} onChange={() => {}}><option value={stop.stop_id}>{stop.stop_name}</option></select></label>
       <label className={styles.wide}>Konkretny kurs<select value={course} disabled={loading || !direction} onChange={event => setCourse(event.target.value)}>
         <option value="">Wybierz godzinę i kurs</option>{choices.map(item => {
           const instant = (leg === 'arrival' ? item.arrival_at : item.departure_at)!

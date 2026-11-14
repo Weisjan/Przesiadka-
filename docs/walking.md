@@ -1,6 +1,6 @@
 # Saved walking estimates with OpenRouteService
 
-The original optional CLI calculates one directional pair, **`skm:7500 → ztm:2001`**, through OpenRouteService (ORS). A separate [nearby-candidate CLI](nearby.md) now supports bounded, opt-in imports for additional geographic candidates and defaults to dry-run. Results remain **estimates**, not measured walking times or confirmation of platform-to-platform paths. Neither command changes the transfer engine, GTFS files, `transit.db`, scenarios or demos.
+The original optional CLI calculates one directional pair, **`skm:7500 → ztm:2001`**, through OpenRouteService (ORS). A separate [nearby-candidate CLI](nearby.md) now supports bounded, opt-in imports for additional geographic candidates and defaults to dry-run. Results remain **estimates**, not measured walking times or confirmation of platform-to-platform paths. Both import commands store results only in the separate walking cache.
 
 ## Provider contract and reuse
 
@@ -76,22 +76,8 @@ An upsert affects only its directional pair. A → B never supplies B → A. Rea
 
 Seconds/metres remain unchanged. The API also returns `walking_minutes=ceil(walking_seconds/60)` and `rounding="ceil_to_full_minutes"`, preserving the existing integer-minute evaluation contract. No-route metrics are `null`, never zero. Expired/coordinate-mismatched rows remain inspectable as `stale` and are not auto-applied.
 
-## Read-only API and frontend
+## Read-only screen
 
-```text
-GET /api/transit/walking-transfers?from_stop_id=skm:7500&to_stop_id=ztm:2001
-```
+GET `/api/transit/walking-transfers` takes from_stop_id and to_stop_id. Only fresh available values are applied by the screen. Missing, stale, no-route or unreadable cache blocks evaluation until local data is updated. The screen displays attribution and estimated whole minutes rounded up. No manual walking override is exposed.
 
-Response fields: `status` (`available`, `missing`, `stale`, `no_route`), both IDs and `estimate`. Missing entries have `estimate: null`; other states include saved metrics/provenance. Unknown stops return 404, invalid pairs/coordinates 422 and unavailable/corrupt databases 503. None of these paths requests ORS.
-
-Dark Transit loads the saved estimate when its supported pair becomes available. Fresh results fill the walking field and show **Szacowany czas dojścia na podstawie OpenRouteService**, distance, calculation date, rounding and attribution/license. A manual edit, including one made during the request, takes precedence. Delay slider movements and analysis retries neither refetch the estimate nor overwrite that value. Changing the pair clears the old input and requests the new direction. Pair-switch logic is tested independently; the current UI still supports only the original pair.
-
-Missing/stale/no-route/read-error states retain manual input instead of inventing an estimate. The SKM feed lacks physical platform details and an OSM pedestrian graph does not establish current crossings, platform access or step-free accessibility. Scenarios and fictional demos keep their own walking values.
-
-## Verification and live-data limitation
-
-Run the existing [README test commands](../README.md#testing). `tests/fixtures/ors_walking.json` is **synthetic**, not a measured Gdańsk route. Tests block ORS network calls and cover parsing, coordinate order, errors/retries, secret redaction, directional persistence, freshness/rollback, read-only API and manual-override precedence.
-
-During the initial implementation, the actual CLI dry-run confirmed the pair/coordinates, while the real import stopped at **missing ORS_API_KEY**, before a provider request or database creation. Browser auto-fill checks used a synthetic fixture in a separate temporary walking database with ORS calls blocked; their diagnostic screenshots are not evidence of a real walking route.
-
-On **13 November 2026**, a read-only check confirmed the subsequently imported local result: **213.5 m / 153.7 seconds**, `source=openrouteservice`, `confidence=estimated`, still fresh for the unchanged GTFS coordinates. No new provider request or physical path validation was performed. See [nearby discovery](nearby.md#local-observation-13-november-2026) for candidate counts and a zero-request dry-run. The next step is to review one additional candidate before a bounded execution.
+See [approved links](transfer-links.md) for the current screen API.

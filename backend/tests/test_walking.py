@@ -14,7 +14,7 @@ from app.main import create_app
 from app.walking import client, store
 from app.walking.__main__ import main
 from app.walking.client import WalkingError
-from test_gtfs_transfers import setup_feed
+from gtfs_fixtures import setup_feed
 
 PAIR = ("skm:7500", "ztm:2001")
 POINTS = ((18.6443487, 54.3565922), (18.645663339105, 54.355509269859))
@@ -264,7 +264,7 @@ def test_cli_request_budget_is_bounded(limit):
 def test_read_only_endpoint_missing_available_stale_no_route_and_startup(tmp_path, setup_feed):
     transit, walking = setup_feed(), tmp_path / "walking.db"
     before = transit.read_bytes()
-    with TestClient(create_app(tmp_path / "user.db", transit, walking)) as api:
+    with TestClient(create_app(transit, walking)) as api:
         query = {"from_stop_id": PAIR[0], "to_stop_id": PAIR[1]}
         assert not walking.exists()
         response = api.get("/api/transit/walking-transfers", params=query)
@@ -309,7 +309,7 @@ def test_invalid_cache_rows_produce_readable_503_without_modifying_them(tmp_path
     with sqlite3.connect(path) as database:
         database.execute(f"UPDATE walking_transfers SET {column}=?", (value,))
     before = path.read_bytes()
-    with TestClient(create_app(tmp_path / "user.db", transit, path)) as api:
+    with TestClient(create_app(transit, path)) as api:
         response = api.get("/api/transit/walking-transfers", params={"from_stop_id": PAIR[0], "to_stop_id": PAIR[1]})
         assert response.status_code == 503
         assert response.json()["detail"]["code"] == "invalid_cache"

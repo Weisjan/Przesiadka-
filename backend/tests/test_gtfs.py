@@ -329,7 +329,7 @@ def test_cli_and_api_share_configured_database(tmp_path, monkeypatch, feed, caps
     monkeypatch.setenv("PRZESIADKA_TRANSIT_PATH", str(database))
     assert main(["ztm", "--archive", str(feed)]) == 0
     capsys.readouterr()
-    with TestClient(create_app(tmp_path / "user.db")) as client:
+    with TestClient(create_app()) as client:
         assert client.app.state.transit_database_path == database
         assert client.get("/api/transit/sources").json()["sources"][0]["imported"] is True
 
@@ -358,46 +358,14 @@ def test_startup_never_downloads_and_api_does_not_create_gtfs_database(tmp_path,
     def forbidden(*args, **kwargs): raise AssertionError("network called at startup")
     monkeypatch.setattr(archive_module, "urlopen", forbidden)
     transit = tmp_path / "missing.db"
-    with TestClient(create_app(tmp_path / "user.db", transit)) as client:
+    with TestClient(create_app(transit)) as client:
         assert client.get("/api/health").status_code == 200
         assert all(not source["imported"] for source in client.get("/api/transit/sources").json()["sources"])
-        assert client.get("/api/transit/stops").status_code == 503
     assert not transit.exists()
 
 
-def test_transit_api_is_read_only_and_returns_real_fixture_metadata(tmp_path, transit_database):
-    before = transit_database.read_bytes()
-    with TestClient(create_app(tmp_path / "user.db", transit_database)) as client:
-        response = client.get("/api/transit/sources")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["is_realtime"] is False
-        assert data["sources"][0]["imported"] is True
-        assert data["sources"][0]["sha256"]
-        assert data["sources"][1]["imported"] is False
-        response = client.get("/api/transit/stops", params={"query": "gdansk"})
-        assert response.status_code == 200
-        assert response.json()["stops"][0]["stop_id"] == "ztm:1"
-        response = client.get("/api/transit/departures", params={"stop_id": "ztm:2", "date": "2026-11-10"})
-        assert response.status_code == 200
-        departure = response.json()["departures"][0]
-        assert departure["line"] == "8"
-        assert departure["direction"] == "Oliwa"
-        assert departure["departure_at"] == "2026-11-10T00:10:00+01:00"
-        assert client.get("/api/transit/departures", params={"stop_id": "ztm:missing", "date": "2026-11-10"}).status_code == 404
-        assert client.post("/api/transit/stops").status_code == 405
-        assert client.get("/api/transit/stops", params={"query": "%"}).json()["stops"] == []
-    assert transit_database.read_bytes() == before
 
 
-@pytest.mark.parametrize("query", [
-    {"stop_id": "bad", "date": "2026-11-10"}, {"stop_id": "ztm:1", "date": "2026-02-30"},
-    {"stop_id": "ztm:1", "date": "1794294000"}, {"stop_id": "ztm:1", "date": "2026-11-10", "limit": 0},
-    {"stop_id": "ztm:1", "date": "2026-11-10", "limit": 201},
-])
-def test_transit_query_validation(tmp_path, transit_database, query):
-    with TestClient(create_app(tmp_path / "user.db", transit_database)) as client:
-        assert client.get("/api/transit/departures", params=query).status_code == 422
 
 
 def test_missing_departure_is_not_interpolated_and_pickup_forbidden_is_hidden(tmp_path):

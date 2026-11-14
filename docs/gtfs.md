@@ -1,6 +1,8 @@
 # Static GTFS integration
 
-This extension imports official timetable ZIP files explicitly. It does not fetch feeds during FastAPI startup or API requests, provide realtime information, or change the transfer evaluation algorithm. The frontend's main view selects real GTFS journeys for the explicit interchange below; saved scenarios and the three fictional demos remain in the separate Scenariusze view.
+The current four-pair registry, approval audit and extended API contract are documented in [approved transfer links](transfer-links.md). Search uses exact selected courses and cached walking time. `/journeys` accepts `link_id`, defaulting to the original pair. The frontend accepts an SKM train and a ZTM goal. `/transfers/suggest` ranks matching courses across approved boarding stops.
+
+This extension imports official timetable ZIP files explicitly. It does not fetch feeds during FastAPI startup or API requests, provide realtime information, or change the transfer evaluation algorithm. The screen selects actual courses for approved links.
 
 ## Sources and reuse conditions
 
@@ -82,38 +84,9 @@ Following the [GTFS Schedule reference](https://gtfs.org/documentation/schedule/
 
 The departure query uses a **civil Warsaw date**, not a service date. It checks surrounding service days so that 24:xx/25:xx departures and DST boundary spillovers are included once, ordered by UTC instant. `service_date` and `gtfs_departure_time` remain visible in each result.
 
-## Read-only API
+## Screen API
 
-Start the backend with the existing README command. No import occurs on startup.
-
-| Endpoint | Meaning |
-| --- | --- |
-| `GET /api/transit/sources` | Both configured providers, import availability, provenance, attribution and service-date bounds. Works before the first import. |
-| `GET /api/transit/stops?query=glowny&limit=50` | Accent-insensitive substring search, keeping each provider's stops separate. Default limit 50, maximum 100. |
-| `GET /api/transit/departures?stop_id=skm:7500&date=2026-11-11&limit=50` | Planned departures on the given civil date. Default limit 50, maximum 200; `has_more` reports truncation. |
-| `GET /api/transit/journeys?leg=arrival&date=2026-11-12` | Actual scheduled arrivals at the explicit SKM stop, or ZTM departures with `leg=departure`. Default/maximum limit 2,000; `has_more` reports truncation. Optional Warsaw-offset `after` limits departures to the intersection of the civil date and the next six elapsed hours. |
-
-All envelopes contain `is_realtime: false`. Stops/departures return 503 if the transit database is absent or invalid, unknown stops return 404, and invalid query parameters return 422. The OpenAPI schema describes the query parameters. No transit write/import endpoint is exposed.
-
-Example **departure item** observed in the real SKM import on 2026-11-11 (excerpt, not realtime):
-
-```json
-{
-  "operator": "skm",
-  "stop_id": "skm:7500",
-  "stop_name": "GDAŃSK GŁÓWNY",
-  "route_id": "skm:285219",
-  "line": "SKM",
-  "direction": "Gdynia Cisowa",
-  "trip_id": "skm:285219",
-  "service_id": "skm:285219",
-  "service_date": "2026-11-11",
-  "gtfs_departure_time": "00:04:00",
-  "departure_at": "2026-11-11T00:04:00+01:00"
-}
-```
-
-The same query also returned a `24:15:00` departure belonging to service date **2026-11-10**, exposed as `2026-11-11T00:15:00+01:00`. ZTM stop `ztm:2001` returned line `6` toward `Jelitkowo` at `2026-11-11T04:57:00+01:00`. These IDs/times can change on the next import.
+The current course-selection and evaluation API is documented in [approved links](transfer-links.md) and the root README. Provider metadata remains available through /api/transit/sources.
 
 ## Safety limits and unsupported data
 
@@ -121,143 +94,8 @@ The same query also returned a `24:15:00` departure belonging to service date **
 - ZIP: at most 64 root-level members, 512 MiB expanded total, 256 MiB per member, compression ratio at most 200, central directory at most 1 MiB. Stored/deflate compression only. Paths, links, duplicate names, encrypted entries, ZIP64 and multipart archives are rejected. Files are streamed, never extracted to disk.
 - CSV: strict UTF-8/UTF-8 BOM and header/column checks; at most 4 million rows per file, 128 columns and 1,048,576 characters per physical line. Optional metadata files are limited to 1 MiB. IDs, coordinates, times, calendar values, foreign keys and trip chronology are validated.
 - Extended times through `167:59:59` are supported. Frequency-based schedules with nonempty `frequencies.txt` are rejected rather than presented as exact departures. Missing departure times are counted and omitted, without interpolation. Pickup type 1 is excluded; types 2/3 are returned as provided and may require prior arrangements.
-- Optional files outside the imported model are listed in `ignored_files`. The importer is not a full GTFS validator or network-wide journey planner. No automatic cross-provider walking links, live feeds, refresh job or schema migrations are included. The frontend picker supports only the explicit pair below.
+- Optional files outside the imported model are listed in `ignored_files`. The importer is not a full GTFS validator or network-wide journey planner. No automatic cross-provider walking links, live feeds, refresh job or schema migrations are included. The frontend picker uses the approved-link registry.
 
 ## Verification
 
 Use the backend and frontend test commands in [README](../README.md#testing). Tests use tiny generated local ZIP fixtures, never download live feeds, and isolate SQLite files. They cover calendar variants, weekdays/exceptions, 24+/29-hour times, midnight/DST, namespace collisions, rollback, invalid ZIPs, network failures, limits, query validation and read-only behavior. Real-feed imports are a separate manual smoke check, not a network-dependent unit test.
-
-## First interchange search
-
-This feature covers **Gdańsk Główny SKM → Dworzec Główny 01 ZTM**. Its read-only API and frontend do not change saved scenarios or demos, download feeds or write to either database.
-
-### Stop audit and walking assumption
-
-The local snapshots described above were inspected again on **12 November 2026**. SKM contains `skm:7500` (`GDAŃSK GŁÓWNY`, 54.3565922, 18.6443487), with `location_type=0` and no `parent_station`. It does **not** distinguish physical platforms. The import must not be presented as platform-level information.
-
-ZTM has twelve separate records, all with `location_type=0` and no `parent_station`:
-
-| Namespaced stop ID | Name |
-| --- | --- |
-| `ztm:1013` | Dworzec Główny 18 |
-| `ztm:1014` | Dworzec Główny 05 |
-| `ztm:1015` | Dworzec Główny 14 |
-| `ztm:1016` | Dworzec Główny 07 |
-| `ztm:1017` | Dworzec Główny 12 |
-| `ztm:1019` | Dworzec Główny 10 |
-| `ztm:1020` | Dworzec Główny 11 |
-| `ztm:1021` | Dworzec Główny 08 |
-| `ztm:1022` | Dworzec Główny 13 |
-| `ztm:1023` | Dworzec Główny 06 |
-| `ztm:2001` | Dworzec Główny 01 |
-| `ztm:2002` | Dworzec Główny 02 |
-
-The immutable `TransferLink` in `transfer_search.py` explicitly selects **`skm:7500 → ztm:2001`**, ID `gdansk-glowny-skm-ztm-01`. ZTM stop 01 is at 54.355509269859, 18.645663339105. Neither names nor coordinate distances create links; parents and nearby stops are never expanded automatically. Missing stops or a changed `location_type` invalidate the link. Revalidate the pairing when feed identifiers change.
-
-No measured or authoritative walking-time evidence is available. `walking_minutes` is mandatory in every search, with `walking_time_source="estimated"` and `walking_time_basis="user_input"`. The API cannot promote this to `verified`. The example value of 5 minutes below is an assumption, not a recommendation or accessibility guarantee. Access paths, crossings and the actual SKM platform need separate verification.
-
-Stop 01 serves different routes and variants. For example, route `ztm:6`, `direction_id=0`, has headsigns `Jelitkowo` and `Strzyża PKM` in the snapshot; `ztm:12` has `Strzyża PKM`, `Wilka-Krzyżanowskiego` and `Zaspa`. SKM direction IDs are absent; the arriving course is selected explicitly by trip ID and service date, retaining the supplied headsign.
-
-### Contract
-
-- `GET /api/transit/transfer-links`: describe the one configured pair, both stop records and the walking assumption. Returns 409 if imported stops cannot support it, 503 if the database is unavailable.
-- `POST /api/transit/transfers/search`: read-only search and evaluation. The JSON fields are documented below and in `/openapi.json`.
-
-| Input | Meaning and bounds |
-| --- | --- |
-| `link_id` | Required explicit pair ID. Other pairs return 404. |
-| `arrival_trip_id` | Required namespaced SKM trip ID, not a line name. |
-| `arrival_service_date` | Required ISO date `YYYY-MM-DD`: **day of service**, not necessarily the civil arrival date. |
-| `arrival_stop_sequence` | Optional exact occurrence if a trip visits `skm:7500` more than once; otherwise ambiguity returns 409. |
-| `departure_route_id` | Required namespaced ZTM route ID, not its display name. |
-| `departure_trip_id` | Optional reference trip selecting a downstream variant. This chooses a pattern, not the reference trip's service date. |
-| `departure_service_date` | Optional ISO service date. With `departure_trip_id`, select that exact departure rather than the first courses in its variant. An inactive, missing or out-of-window occurrence returns 422. |
-| `departure_stop_sequence` | Optional boarding occurrence, requiring `departure_trip_id`. Resolves a repeated visit on a trip. |
-| `walking_minutes` | Required integer 0–180; estimated by the caller. |
-| `delay_minutes` | Simulated delay 0–180, finite; default 0. No realtime delay is read. |
-| `window_minutes` | Elapsed search interval from the **scheduled SKM arrival**, 1–360 minutes; default 120. End is exclusive. |
-| `limit` | Number of evaluations returned, 1–10; default 5. `has_more` reports additional matching departures. |
-
-Candidates are sorted by actual instant starting at the scheduled arrival, **without shifting the search by the simulated delay**. A candidate can therefore already be unreachable at zero delay; inspect `evaluation.status` and `has_safe_margin`. `outcome="evaluated"` means evaluations were produced, not that all transfers are reachable. `outcome="no_departures"` means no usable departure of the selected variant exists in this window, not that the entire network has no service.
-
-Both feeds, calendars and stop patterns are read in one SQLite read-only transaction. The incoming trip's calendar is checked on its service date; its `arrival_time`, not its departure time, feeds the existing pure `evaluate_transfer` function. Outgoing candidates reuse the same UTC/calendar query as `/departures`, retaining their own `service_date`, raw extended GTFS time and offset-aware timestamp. GTFS noon-minus-12-hours conversion, midnight and DST semantics remain unchanged.
-
-Plan B uses the **same stop, exact route ID, direction ID, effective headsign and ordered downstream sequence of stop IDs with pickup/drop-off restrictions**. Shape geometry is not imported; matching does not claim geometric path identity. Upstream differences before the boarding stop are irrelevant to this conservative downstream match. Multiple directions or downstream patterns return 409 `ambiguous_departure_variant` with reference-trip choices (up to 20, with `has_more_choices`). Resubmit with a chosen `departure_trip_id`. This deliberately rejects some potentially usable variants rather than guessing. Multiple indistinguishable Plan B courses at the same instant return 409 `ambiguous_plan_b`, exposing their IDs instead of choosing one arbitrarily.
-
-Only unconditional boarding/alighting (`pickup_type=0` / incoming `drop_off_type=0`) is supported. Missing arrival times, terminal-only boarding and reserved/on-request services are not treated as ordinary transfers. More than 2,000 candidate departures or 1,000 downstream stop records returns a readable 409 instead of truncating analysis. The result limit does not truncate the courses inspected for Plan B.
-
-404 identifies unknown links, arriving trips or routes. 422 identifies invalid inputs, inactive incoming services, unusable arrivals or dates outside feed bounds. In particular, the SKM service date and the **entire outgoing civil-date window** must fit their respective imported service-date bounds. The latter is conservative: even a known 24+ departure beyond the final ZTM service date cannot establish full search coverage, so this search rejects that boundary window. The existing `/departures` endpoint can still expose such spillover departures. Dates inside the bounds can legitimately have no courses. Historical queries are allowed; being inside calendar bounds is not a guarantee that the latest publication was imported. Source timestamps and hashes remain visible for freshness checks.
-
-Plan B is bounded by the search window. `unavailable` means no matching reachable later course **within that window**, never a claim that no later service exists anywhere. `sources` retains the existing attribution, official URLs, import/download timestamps, calendar bounds and hashes. All responses are `is_realtime=false` with `schedule_status="planned"` on evaluations.
-
-### Real local HTTP example
-
-Observed using the existing local imports on **12 November 2026**, via a temporary Uvicorn server and real HTTP requests; no fresh download was performed. After starting the normal backend, use PowerShell:
-
-```powershell
-$body = @{
-    link_id = "gdansk-glowny-skm-ztm-01"
-    arrival_trip_id = "skm:284778"
-    arrival_service_date = "2026-11-12"
-    departure_route_id = "ztm:6"
-    walking_minutes = 5
-    delay_minutes = 10
-    limit = 2
-} | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/transit/transfers/search" -ContentType "application/json" -Body $body
-```
-
-IDs and availability can change after reimport. The SKM arrival is `skm:284778`, service/route ID `skm:284778`, stop sequence 27, at `2026-11-12T17:32:00+01:00`, toward Gdańsk Śródmieście. The response includes an earlier, already unreachable departure at 17:35. The **second result** (excerpt) is:
-
-```json
-{
-  "departure": {
-    "operator": "ztm",
-    "stop_id": "ztm:2001",
-    "route_id": "ztm:6",
-    "trip_id": "ztm:6202611121723_21_006-01",
-    "service_id": "ztm:220261112",
-    "service_date": "2026-11-12",
-    "direction_id": 0,
-    "direction": "Jelitkowo",
-    "departure_at": "2026-11-12T17:45:00+01:00"
-  },
-  "evaluation": {
-    "margin_minutes": -2.0,
-    "delay_threshold_minutes": 8.0,
-    "status": "Nie zdążysz",
-    "has_safe_margin": true,
-    "expected_stop_arrival_at": "2026-11-12T17:47:00+01:00",
-    "plan_b_status": "available",
-    "plan_b_departure_at": "2026-11-12T17:55:00+01:00"
-  },
-  "plan_b": {
-    "operator": "ztm",
-    "route_id": "ztm:6",
-    "trip_id": "ztm:6202611121733_21_006-02",
-    "service_date": "2026-11-12",
-    "direction": "Jelitkowo",
-    "departure_at": "2026-11-12T17:55:00+01:00"
-  }
-}
-```
-
-For this same second result, delay 0 gives +8 minutes / `Zdążysz`; delay 8 gives zero / `Na styk`; delay 10 gives −2 / `Nie zdążysz` and the Plan B above. Neither reachable result requires Plan B. The real HTTP checks also confirmed 422 outside calendar bounds, 404 for an unknown link and unchanged SHA-256 hashes of both existing databases.
-
-Fixture tests cover these boundaries plus calendar-only/dates-only data, exceptions, weekends, 24+/25+ times, spring/fall DST, exact stop occurrences, route/direction/downstream/platform separation, missing data, no later course, bounded searches and no writes or network calls. Run the full regression using the README commands.
-
-Next step: measure and document the walking path from actual SKM platforms to ZTM stop 01 before labeling any walking time as verified or exposing the connection as platform-accurate.
-
-## Dark Transit frontend
-
-Open **Rozkłady** after importing both feeds and starting the backend/frontend. The two **Wybierz kurs / Zmień kurs** buttons open native modal dialogs. Operator and stop are limited to the supported pair. Lists come from `/journeys`, with SKM service-specific route IDs grouped under their supplied line name for selection. Each actual course keeps its exact route, trip, service date and stop sequence; identical display names never identify a transfer or Plan B.
-
-The picker date means a **civil arrival/departure date in Warsaw**. The backend resolves calendar exceptions, 24+ times and DST. Options retain the service date and show offset information for repeated autumn hours. The departure picker sends the chosen arrival as `after`, so it lists only courses within the supported six-hour window; choose the next date explicitly when crossing midnight. The final search still validates every selection against the database. A reimport that changes selected times requires choosing the course again instead of mixing card times and a newer evaluation.
-
-Walking time uses a fresh saved [OpenRouteService estimate](walking.md) when available; otherwise it starts **empty** and must be entered explicitly. It remains estimated and manually editable. Selecting actual scheduled courses never inserts scenarios. The delay slider starts at **0**, labeled **Brak danych o aktualnym opóźnieniu — symulacja**. Moving it marks **Ręczna korekta**; retries and returning from Scenariusze preserve that value. Choosing a new course starts a fresh zero-delay simulation; **Przywróć 0 min** is an explicit user action. Static GTFS supplies no realtime delay: `/journeys` exposes `realtime_delay: null`. A future realtime integration must separately establish trip/service-day matching, source and update time before setting an automatic value; no such adapter is implemented here.
-
-Both course lists and analysis requests abort superseded requests and ignore late responses. An analysis is displayed only for its complete current input, including course occurrences and the selected import's timestamps. The frontend uses the existing backend result for status, margin and Plan B; the SVG walking/running/stopped figure follows that status without redefining thresholds. `Na styk` therefore still means exactly zero margin.
-
-The main view uses the supplied dark palette, two journey cards and one central SVG figure. At 390 px the cards precede the figure and slider in one column. Dates/offsets, the existing timeline, Plan B and provider attribution remain available through disclosures. Native controls, explicit labels, modal focus wrapping and visible keyboard focus accompany `prefers-reduced-motion`. The old CRUD and all three fictional demos remain available under **Scenariusze**.
-
-The actual desktop/mobile captures are linked in the README. Verification used a locally cached GTFS import, a separate temporary scenario database and temporary server ports, with browser requests forwarded to that isolated backend. Failure-state checks deliberately injected error responses; the successful timetable results came from the real local backend. Browser checks were an ad-hoc Playwright/Edge run, not a committed or CI-managed end-to-end suite. Existing user-data and GTFS database hashes were checked for changes.

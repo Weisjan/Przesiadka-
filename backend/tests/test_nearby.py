@@ -6,12 +6,10 @@ from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app.main import create_app
 from app.walking import candidates, client, store
 from app.walking.nearby import haversine, nearby
-from test_gtfs_transfers import files, setup_feed
+from gtfs_fixtures import files, setup_feed
 
 PAIR = ("skm:7500", "ztm:2001")
 RESULT = {"status": "available", "distance_m": 213.5, "walking_seconds": 153.7}
@@ -134,21 +132,6 @@ def test_rate_limit_and_auth_stop_entire_batch(tmp_path, setup_feed, monkeypatch
     walking=tmp_path/'walking.db'
     plan=candidates.run(setup_feed(),walking,PAIR[0],max_pairs=3,max_requests=10,execute=True)
     assert len(calls)==1 and plan['errors'] and not walking.exists()
-
-
-def test_api_contract_validation_and_no_mutation(tmp_path, setup_feed):
-    transit,walking=setup_feed(),tmp_path/'walk.db'
-    store.save_result(walking,*PAIR,store.stop_pair(transit,*PAIR),RESULT)
-    before=(transit.read_bytes(),walking.read_bytes())
-    with TestClient(create_app(tmp_path/'user.db',transit,walking)) as api:
-        r=api.get('/api/transit/nearby-stops',params={'stop_id':PAIR[0]})
-        assert r.status_code==200 and r.json()['cache_hits']==1
-        for query in ({'stop_id':'bad'},{'stop_id':PAIR[0],'radius_m':'nan'},{'stop_id':PAIR[0],'limit':101}):
-            assert api.get('/api/transit/nearby-stops',params=query).status_code==422
-        assert api.get('/api/transit/nearby-stops',params={'stop_id':'skm:unknown'}).status_code==404
-        assert api.get('/api/transit/nearby-stops',params={'stop_id':'skm:H'}).status_code==422
-    assert before==(transit.read_bytes(),walking.read_bytes())
-
 
 def test_refresh_recalculates_only_when_explicit_and_missing_key_never_counts_a_request(tmp_path, setup_feed, monkeypatch):
     transit, walking = setup_feed(), tmp_path/'walking.db'

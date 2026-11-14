@@ -2,7 +2,6 @@ export interface LocalDateTime {
   date: string
   time: string
   offset: string
-  original?: string
 }
 
 const partsFormat = new Intl.DateTimeFormat('en-CA', {
@@ -15,13 +14,9 @@ function localParts(date: Date) {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}`, seconds: parts.second }
 }
 
-export function emptyDateTime(): LocalDateTime {
-  return { date: '', time: '', offset: '' }
-}
-
 export function fromIso(iso: string): LocalDateTime {
   const parts = localParts(new Date(iso))
-  return { date: parts.date, time: parts.time, offset: iso.slice(-6), original: iso }
+  return { date: parts.date, time: parts.time, offset: iso.slice(-6) }
 }
 
 export function dateTimeOptions(value: LocalDateTime): string[] {
@@ -45,20 +40,6 @@ export function dateTimeOptions(value: LocalDateTime): string[] {
     const offset = `${minutes >= 0 ? '+' : '-'}${String(Math.floor(absolute / 60)).padStart(2, '0')}:${String(absolute % 60).padStart(2, '0')}`
     return [`${wall}${offset}`]
   })
-}
-
-export function toIso(value: LocalDateTime): string {
-  if (!value.date || !value.time) throw new Error('Wybierz datę i godzinę każdego kursu.')
-  const options = dateTimeOptions(value)
-  if (!options.length) throw new Error('Ta godzina nie istnieje w Warszawie. Sprawdź datę i zmianę czasu.')
-  const selected = options.length === 1 ? options[0] : value.offset ? options.find(option => option.endsWith(value.offset)) : undefined
-  if (!selected) throw new Error('Ta godzina występuje dwa razy. Wybierz pierwsze lub drugie wystąpienie.')
-  // Editing unrelated fields must not discard seconds or fractional seconds already stored.
-  if (value.original) {
-    const original = fromIso(value.original)
-    if (original.date === value.date && original.time === value.time && original.offset === selected.slice(-6)) return value.original
-  }
-  return selected
 }
 
 export const clock = (iso: string) => new Intl.DateTimeFormat('pl-PL', {

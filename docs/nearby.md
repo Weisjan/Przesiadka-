@@ -1,38 +1,10 @@
 # Nearby GTFS stops and controlled walking imports
 
-Nearby discovery proposes **geographic candidates**, not validated interchange links. It uses only the imported GTFS database and the saved walking cache. It does not call ORS, change schedules, create transfer links or extend the current single-pair journey search/UI.
+Nearby discovery proposes **geographic candidates**, not validated interchange links. It uses only the imported GTFS database and the saved walking cache. It does not call ORS, change schedules or create transfer links. Search/UI availability is controlled by the separate [approved-link registry](transfer-links.md).
 
-## Discovery contract
+## Candidate helper
 
-```text
-GET /api/transit/nearby-stops?stop_id=skm:7500&radius_m=500&limit=50
-```
-
-- `stop_id`: an exact namespaced `skm:` or `ztm:` ID. The origin must be a boarding stop (`location_type=0`) with valid coordinates.
-- `radius_m`: finite, greater than zero and at most 2000; default **500 metres**, inclusive at the boundary.
-- `limit`: integer 1–100; default 50. Results are ordered by distance, then ID. Selection uses bounded memory; discovery still scans the opposite operator's stops to count all candidates.
-- Only the **other operator's** boarding stops are considered. Same-name stops, individual ZTM poles and duplicate coordinates remain separate IDs. Stations, entrances and invalid coordinates are excluded and counted in `rejected`.
-- Haversine distance uses a mean Earth radius of 6,371,008.8 m. It is a straight-line filter, **never an inferred walking duration**.
-
-The response includes `stop`, `radius_m`, `distance_method`, `candidate_count` (all matches), `returned_count`, `limit`, `has_more`, `cache_hits`, `rejected`, `candidates` and `limitations`. Cache hits count fresh `available` and fresh `no_route` entries **among returned candidates**.
-
-Each candidate contains:
-
-| Field | Meaning |
-| --- | --- |
-| `from_stop_id`, `to_stop_id` | Directional, namespaced IDs. |
-| `from_stop`, `to_stop` | Operator/name, source ID, stop code/name, coordinates, `location_type` and `parent_station`. |
-| `straight_line_distance_m` | Haversine metres; not the ORS route distance. |
-| `has_saved_result` | A cache row exists, including stale/no-route results. |
-| `has_saved_walking_route` | A saved positive route exists; inspect `status` before using it. |
-| `status` | `missing`, `available`, `stale` or `no_route`. |
-| `walking_seconds`, `source`, `confidence` | Saved raw values, or null. Stale values are historical, not usable estimates. |
-| `estimate` | Saved metrics, coordinates, timestamps, expiry and attribution/license provenance, or null. |
-| `coordinates` | Current GTFS endpoints in `[longitude, latitude]` order. |
-
-Unknown origins return 404, invalid query/origin coordinates or non-boarding origins 422, and unavailable/corrupt databases 503. Reads never create a walking database. Reverse discovery reads the reverse cache pair independently.
-
-`location_type=0` does not prove a physical SKM platform is identified. These candidates require further review before being used as interchange links. There is no name-based merge or platform-to-platform claim.
+The internal nearby helper supplies geographic candidates to the explicit CLI, independently of approved links.
 
 ## Default dry-run CLI
 

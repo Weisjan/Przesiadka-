@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 169 169" role="img" aria-label="Nie zdążysz">
+<g fill="none" stroke="#8A8F99" stroke-linejoin="round" stroke-linecap="round">
+<polyline stroke-width="12" points="90,69 79,91 79,111"><animate attributeName="points" dur="2.4s" repeatCount="indefinite" values="90,69 79,91 79,111;91,70 80,92 80,112;90,69 79,91 79,111;90,68 78,90 78,110;90,69 79,91 79,111"/></polyline>
+<polyline stroke-width="12" points="90,69 103,91 104,111"><animate attributeName="points" dur="2.4s" repeatCount="indefinite" values="90,69 103,91 104,111;91,70 104,92 105,112;90,69 103,91 104,111;90,68 102,90 103,110;90,69 103,91 104,111"/></polyline>
+<polyline stroke-width="15" points="88,108 79,130 77,153"><animate attributeName="points" dur="2.4s" repeatCount="indefinite" values="88,108 79,130 77,153;88,108 79,130 77,153;88,108 79,130 77,153;88,108 79,130 77,153;88,108 79,130 77,153"/></polyline>
+<polyline stroke-width="15" points="88,108 96,130 97,153"><animate attributeName="points" dur="2.4s" repeatCount="indefinite" values="88,108 96,130 97,153;88,108 96,130 97,153;88,108 96,130 97,153;88,108 96,130 97,153;88,108 96,130 97,153"/></polyline>
+<polyline stroke-width="19" points="90,69 88,108"><animate attributeName="points" dur="2.4s" repeatCount="indefinite" values="90,69 88,108;91,70 88,108;90,69 88,108;90,68 88,108;90,69 88,108"/></polyline>
+</g>
+<circle fill="#8A8F99" r="15" cx="105" cy="46">
+<animate attributeName="cx" dur="2.4s" repeatCount="indefinite" values="105;107;105;104;105"/>
+<animate attributeName="cy" dur="2.4s" repeatCount="indefinite" values="46;48;46;45;46"/>
+</circle></svg>

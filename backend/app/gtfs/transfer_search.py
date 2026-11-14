@@ -1,4 +1,4 @@
-"""One explicit interchange; read local schedules and reuse the pure evaluator."""
+"""Explicit directional interchanges; local schedules and the pure evaluator."""
 
 import json
 import re
@@ -7,14 +7,15 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from ..transfer_logic import evaluate_transfer
+from ..walking.client import WalkingError, coordinates
+from ..walking.store import lookup as walking_lookup
 from .schedule import WARSAW, service_datetime
 from .store import read_connection, stop_data, stop_departures
 
 MAX_CANDIDATES = 2000
-MAX_PATTERN_STOPS = 1000
 
 
 class SearchError(ValueError):
@@ -30,12 +31,26 @@ class TransferLink:
     arrival_stop_id: str
     departure_stop_id: str
     walking_time_source: str = "estimated"
-    walking_time_basis: str = "user_input"
-    walking_minutes: None = None
     note: str = "Jawnie wybrana para; droga i czas dojścia nie zostały zweryfikowane. Feed SKM nie wskazuje peronu."
+    approval_status: str = "approved"
+    approval_basis: str = "gtfs_stop_and_boarding_audit"
+    reviewed_on: str = "2026-11-13"
 
 
 LINK = TransferLink("gdansk-glowny-skm-ztm-01", "skm:7500", "ztm:2001")
+# Approval follows the stop/course audit in docs/transfer-links.md, independently of the walking cache.
+LINKS = {link.id: link for link in (
+    LINK,
+    TransferLink("gdansk-glowny-skm-pks-01", "skm:7500", "ztm:2135"),
+    TransferLink("gdansk-glowny-skm-pks-02", "skm:7500", "ztm:2136"),
+    TransferLink("gdansk-glowny-skm-ztm-08", "skm:7500", "ztm:1021"),
+)}
+
+
+def find_link(link_id: str) -> TransferLink:
+    if link_id not in LINKS:
+        raise SearchError(404, "link_not_found", "Nie ma zatwierdzonego powiązania dla tej pary i kierunku. Wybierz powiązanie z transfer-links.")
+    return LINKS[link_id]
 
 
 def iso_date(value):
@@ -52,37 +67,47 @@ class TransferSearchInput(BaseModel):
     arrival_service_date: Annotated[date, BeforeValidator(iso_date)]
     arrival_stop_sequence: int | None = Field(default=None, strict=True, ge=0, le=2**31 - 1)
     departure_route_id: str = Field(pattern=r"^ztm:.+$", max_length=260)
-    # A reference trip selects its downstream variant, not its service date.
-    departure_trip_id: str | None = Field(default=None, pattern=r"^ztm:.+$", max_length=260)
-    departure_service_date: Annotated[date, BeforeValidator(iso_date)] | None = None
+    departure_trip_id: str = Field(pattern=r"^ztm:.+$", max_length=260)
+    departure_service_date: Annotated[date, BeforeValidator(iso_date)]
     departure_stop_sequence: int | None = Field(default=None, strict=True, ge=0, le=2**31 - 1)
-    walking_minutes: int = Field(strict=True, ge=0, le=180)
-    delay_minutes: float = Field(default=0, strict=True, ge=0, le=180, allow_inf_nan=False)
-    window_minutes: int = Field(default=120, strict=True, ge=1, le=360)
-    limit: int = Field(default=5, strict=True, ge=1, le=10)
-
-    @model_validator(mode="after")
-    def validate_departure_selection(self):
-        if (self.departure_service_date is not None or self.departure_stop_sequence is not None) and not self.departure_trip_id:
-            raise ValueError("Wybór daty lub wystąpienia odjazdu wymaga departure_trip_id.")
-        return self
+    delay_minutes: float = Field(default=0, strict=True, ge=0, le=30, allow_inf_nan=False)
 
 
-def linked_stops(connection):
+def linked_stops(connection, link: TransferLink = LINK):
     stops = []
-    for stop_id in (LINK.arrival_stop_id, LINK.departure_stop_id):
+    for stop_id in (link.arrival_stop_id, link.departure_stop_id):
         row = connection.execute("SELECT * FROM gtfs_stops WHERE id=?", (stop_id,)).fetchone()
-        if row is None or row["location_type"] != 0:
+        if row is None or row["location_type"] != 0 or row["operator"] != stop_id.split(":", 1)[0]:
             raise SearchError(409, "link_unavailable", "Jawne powiązanie wymaga obu konkretnych przystanków typu 0 w lokalnym imporcie.", stop_id=stop_id)
         stops.append(row)
     return stops
 
 
-def transfer_links(path: Path) -> dict:
+def walking_for_link(path: Path, walking_path: Path | None, link: TransferLink, arrival, departure) -> dict:
+    if walking_path is None:
+        return {"status": "missing", "from_stop_id": link.arrival_stop_id, "to_stop_id": link.departure_stop_id, "estimate": None}
+    points = (coordinates(arrival["longitude"], arrival["latitude"]), coordinates(departure["longitude"], departure["latitude"]))
+    return walking_lookup(walking_path, path, link.arrival_stop_id, link.departure_stop_id, points=points)
+
+
+def transfer_links(path: Path, walking_path: Path | None = None) -> dict:
     with read_connection(path) as connection:
         connection.execute("BEGIN")
-        arrival, departure = linked_stops(connection)
-        return {"is_realtime": False, "links": [{**asdict(LINK), "arrival_stop": stop_data(arrival), "departure_stop": stop_data(departure)}]}
+        links, unavailable = [], []
+        for link in LINKS.values():
+            try:
+                arrival, departure = linked_stops(connection, link)
+            except SearchError as error:
+                unavailable.append({"id": link.id, **error.detail})
+                continue
+            try:
+                walking = walking_for_link(path, walking_path, link, arrival, departure)
+            except WalkingError as error:
+                walking = {"status": "error", "message": str(error)}
+            links.append({**asdict(link), "arrival_stop": stop_data(arrival), "departure_stop": stop_data(departure), "walking": walking})
+        if not links:
+            raise SearchError(409, "link_unavailable", "Brak zatwierdzonych powiązań z poprawnymi przystankami w lokalnym imporcie.")
+        return {"is_realtime": False, "links": links, "unavailable_links": unavailable}
 
 
 def service_runs(connection, service_id: str, day: date) -> bool:
@@ -98,30 +123,6 @@ def service_runs(connection, service_id: str, day: date) -> bool:
                 and row["days"] & (1 << day.weekday()))
 
 
-def variant_key(connection, trip_id: str, sequence: int, direction, headsign):
-    rows = connection.execute("""SELECT stop_id,pickup_type,drop_off_type FROM gtfs_stop_times
-        WHERE trip_id=? AND stop_sequence>=? ORDER BY stop_sequence LIMIT ?
-    """, (trip_id, sequence, MAX_PATTERN_STOPS + 1)).fetchall()
-    if len(rows) > MAX_PATTERN_STOPS:
-        raise SearchError(409, "pattern_too_large", "Przebieg kursu przekracza limit obsługiwany przez to wyszukiwanie.")
-    return direction, headsign, tuple(tuple(row) for row in rows)
-
-
-def reference_variant(connection, data: TransferSearchInput):
-    rows = connection.execute("""
-        SELECT st.stop_sequence,st.headsign,t.headsign AS trip_headsign,t.direction_id
-        FROM gtfs_stop_times st JOIN gtfs_trips t ON t.id=st.trip_id
-        WHERE st.trip_id=? AND st.stop_id=? AND t.route_id=? AND st.pickup_type=0
-          AND (? IS NULL OR st.stop_sequence=?)
-        ORDER BY st.stop_sequence LIMIT 2
-    """, (data.departure_trip_id, LINK.departure_stop_id, data.departure_route_id,
-          data.departure_stop_sequence, data.departure_stop_sequence)).fetchall()
-    if len(rows) != 1:
-        raise SearchError(409, "ambiguous_reference", "Kurs wzorcowy musi jednoznacznie obsługiwać wybrany słupek i trasę z ogólnodostępnym wejściem.")
-    row = rows[0]
-    return variant_key(connection, data.departure_trip_id, row["stop_sequence"], row["direction_id"], row["headsign"] or row["trip_headsign"] or None)
-
-
 def require_coverage(metadata: dict, first: date, last: date):
     if first.isoformat() < metadata["service_start_date"] or last.isoformat() > metadata["service_end_date"]:
         raise SearchError(422, "feed_out_of_range", "Żądana data lub pełne okno wyszukiwania jest poza zakresem lokalnego feedu. Zaimportuj właściwy rozkład.",
@@ -129,10 +130,11 @@ def require_coverage(metadata: dict, first: date, last: date):
 
 
 def journeys(path: Path, leg: Literal["arrival", "departure"], day: date, limit: int,
-             after: datetime | None = None) -> dict:
+             after: datetime | None = None, link_id: str = LINK.id) -> dict:
+    link = find_link(link_id)
     with read_connection(path) as connection:
         connection.execute("BEGIN")
-        arrival, departure = linked_stops(connection)
+        arrival, departure = linked_stops(connection, link)
         stop = arrival if leg == "arrival" else departure
         metadata = json.loads(connection.execute("SELECT metadata FROM gtfs_sources WHERE operator=?", (stop["operator"],)).fetchone()[0])
         require_coverage(metadata, day, day)
@@ -148,97 +150,78 @@ def journeys(path: Path, leg: Literal["arrival", "departure"], day: date, limit:
             anchor = after.astimezone(timezone.utc)
             start, end = max(start, anchor), min(end, anchor + timedelta(hours=6))
         items = stop_departures(connection, stop, metadata, start, end, limit, event=leg) if start < end else []
-        return {"is_realtime": False, "realtime_delay": None, "schedule_status": "planned", "leg": leg,
+        return {"is_realtime": False, "realtime_delay": None, "schedule_status": "planned", "leg": leg, "link_id": link.id,
                 "date": day.isoformat(), "timezone": "Europe/Warsaw", "stop": stop_data(stop), "source": metadata,
                 "journeys": items[:limit], "has_more": len(items) > limit, "limit": limit}
 
 
-def search_transfers(path: Path, data: TransferSearchInput) -> dict:
-    if data.link_id != LINK.id:
-        raise SearchError(404, "link_not_found", "Nie ma jawnego powiązania tych przystanków. Obsługiwane jest tylko SKM Gdańsk Główny → ZTM Dworzec Główny 01.")
+def resolve_arrival(connection, stop_id: str, trip_id: str, service_day: date, stop_sequence: int | None, metadata: dict):
+    require_coverage(metadata, service_day, service_day)
+    rows = connection.execute("""
+        SELECT st.*,t.service_id,t.route_id,t.headsign AS trip_headsign,t.direction_id,r.short_name,r.long_name
+        FROM gtfs_stop_times st JOIN gtfs_trips t ON t.id=st.trip_id JOIN gtfs_routes r ON r.id=t.route_id
+        WHERE st.trip_id=? AND st.stop_id=? AND (? IS NULL OR st.stop_sequence=?)
+        ORDER BY st.stop_sequence LIMIT 2
+    """, (trip_id, stop_id, stop_sequence, stop_sequence)).fetchall()
+    if not rows:
+        raise SearchError(404, "arrival_not_found", "Nie znaleziono tego kursu SKM na wskazanym przystanku.")
+    if len(rows) > 1:
+        raise SearchError(409, "ambiguous_arrival", "Kurs odwiedza przystanek wielokrotnie. Podaj arrival_stop_sequence.")
+    row = rows[0]
+    if not service_runs(connection, row["service_id"], service_day):
+        raise SearchError(422, "arrival_not_running", "Wybrany kurs SKM nie kursuje w podanym dniu kursowania.")
+    if row["arrival_seconds"] is None or row["drop_off_type"] != 0:
+        raise SearchError(422, "arrival_not_usable", "Przesiadka wymaga znanego przyjazdu i ogólnodostępnego wysiadania (drop_off_type=0).")
+    arrival_at = service_datetime(service_day, row["arrival_seconds"])
+    return row, arrival_at
+
+
+def search_transfers(path: Path, data: TransferSearchInput, walking_path: Path | None = None) -> dict:
+    link = find_link(data.link_id)
     with read_connection(path) as connection:
         # Keep both providers, calendars and patterns in one read-only snapshot.
         connection.execute("BEGIN")
-        arrival_stop, departure_stop = linked_stops(connection)
+        arrival_stop, departure_stop = linked_stops(connection, link)
+        walking = walking_for_link(path, walking_path, link, arrival_stop, departure_stop)
+        if walking["status"] != "available":
+            raise SearchError(422, "walking_time_unavailable", "Brak aktualnego szacunku dojścia dla tej pary.", walking_status=walking["status"])
+        walking_minutes = walking["estimate"]["walking_minutes"]
         metadata = {row["operator"]: json.loads(row["metadata"]) for row in connection.execute("SELECT * FROM gtfs_sources")}
-        require_coverage(metadata["skm"], data.arrival_service_date, data.arrival_service_date)
-        rows = connection.execute("""
-            SELECT st.*,t.service_id,t.route_id,t.headsign AS trip_headsign,t.direction_id,r.short_name,r.long_name
-            FROM gtfs_stop_times st JOIN gtfs_trips t ON t.id=st.trip_id JOIN gtfs_routes r ON r.id=t.route_id
-            WHERE st.trip_id=? AND st.stop_id=? AND (? IS NULL OR st.stop_sequence=?)
-            ORDER BY st.stop_sequence LIMIT 2
-        """, (data.arrival_trip_id, LINK.arrival_stop_id, data.arrival_stop_sequence, data.arrival_stop_sequence)).fetchall()
-        if not rows:
-            raise SearchError(404, "arrival_not_found", "Nie znaleziono tego kursu SKM na wskazanym przystanku.")
-        if len(rows) > 1:
-            raise SearchError(409, "ambiguous_arrival", "Kurs odwiedza przystanek wielokrotnie. Podaj arrival_stop_sequence.")
-        row = rows[0]
-        if not service_runs(connection, row["service_id"], data.arrival_service_date):
-            raise SearchError(422, "arrival_not_running", "Wybrany kurs SKM nie kursuje w podanym dniu kursowania.")
-        if row["arrival_seconds"] is None or row["drop_off_type"] != 0:
-            raise SearchError(422, "arrival_not_usable", "Przesiadka wymaga znanego przyjazdu i ogólnodostępnego wysiadania (drop_off_type=0).")
-        arrival_at = service_datetime(data.arrival_service_date, row["arrival_seconds"])
+        row, arrival_at = resolve_arrival(connection, link.arrival_stop_id, data.arrival_trip_id,
+                                         data.arrival_service_date, data.arrival_stop_sequence, metadata["skm"])
         start = arrival_at.astimezone(timezone.utc)
-        end = start + timedelta(minutes=data.window_minutes)
+        end = start + timedelta(hours=6)
         require_coverage(metadata["ztm"], start.astimezone(WARSAW).date(), (end - timedelta(microseconds=1)).astimezone(WARSAW).date())
         route = connection.execute("SELECT 1 FROM gtfs_routes WHERE id=? AND operator='ztm'", (data.departure_route_id,)).fetchone()
         if route is None:
             raise SearchError(404, "route_not_found", "Nie znaleziono wskazanej trasy ZTM.")
-        selected_variant = reference_variant(connection, data) if data.departure_trip_id else None
         if data.departure_service_date is not None:
             require_coverage(metadata["ztm"], data.departure_service_date, data.departure_service_date)
         candidates = stop_departures(connection, departure_stop, metadata["ztm"], start, end, MAX_CANDIDATES, data.departure_route_id)
         if len(candidates) > MAX_CANDIDATES:
-            raise SearchError(409, "too_many_departures", "Przekroczono limit kursów. Skróć window_minutes.")
-        groups = {}
-        for item in candidates:
-            if item["pickup_type"] != 0:
-                continue
-            key = variant_key(connection, item["trip_id"], item["stop_sequence"], item["direction_id"], item["direction"])
-            if len(key[2]) < 2:  # No downstream stop: do not propose boarding at a terminus.
-                continue
-            groups.setdefault(key, []).append(item)
-        if selected_variant is None and len(groups) > 1:
-            choices = [{"departure_trip_id": items[0]["trip_id"], "direction_id": key[0], "direction": key[1],
-                        "downstream_stop_ids": [stop[0] for stop in key[2]], "first_departure_at": items[0]["departure_at"]}
-                       for key, items in groups.items()]
-            raise SearchError(409, "ambiguous_departure_variant", "Trasa ma kilka kierunków lub przebiegów. Wybierz departure_trip_id jako wzorzec wariantu; nie dopasowujemy po samej nazwie.",
-                              choices=choices[:20], has_more_choices=len(choices) > 20)
-        matching = groups.get(selected_variant, []) if selected_variant is not None else next(iter(groups.values()), [])
-        selected = matching
-        if data.departure_service_date is not None:
-            selected = [item for item in matching if item["trip_id"] == data.departure_trip_id
-                        and item["service_date"] == data.departure_service_date.isoformat()
-                        and (data.departure_stop_sequence is None or item["stop_sequence"] == data.departure_stop_sequence)]
-            if len(selected) != 1:
-                raise SearchError(422, "departure_not_available", "Wybrany odjazd nie jest jednoznacznie dostępny w oknie do 6 godzin od przyjazdu. Sprawdź datę, kurs i kolejność przystanków.")
-        results = []
-        for item in selected[:data.limit]:
-            departure = datetime.fromisoformat(item["departure_at"])
-            later = [candidate for candidate in matching
-                     if datetime.fromisoformat(candidate["departure_at"]).astimezone(timezone.utc) > departure.astimezone(timezone.utc)]
-            evaluation = evaluate_transfer(arrival_at, departure, data.walking_minutes, data.delay_minutes,
-                                           [datetime.fromisoformat(candidate["departure_at"]) for candidate in later])
-            alternatives = [candidate for candidate in later if datetime.fromisoformat(candidate["departure_at"]).astimezone(timezone.utc)
-                            == evaluation.plan_b_departure_at.astimezone(timezone.utc)] if evaluation.plan_b_departure_at else []
-            if len(alternatives) > 1:
-                raise SearchError(409, "ambiguous_plan_b", "Kilka zgodnych kursów ma ten sam moment odjazdu Planu B. Nie wybieramy arbitralnie identyfikatora kursu.", choices=alternatives)
-            plan_b = alternatives[0] if alternatives else None
-            results.append({"departure": item, "evaluation": asdict(evaluation), "plan_b": plan_b})
+            raise SearchError(409, "too_many_departures", "Przekroczono limit kursów w oknie wyszukiwania.")
+        selected = [item for item in candidates if item["trip_id"] == data.departure_trip_id
+                    and item["service_date"] == data.departure_service_date.isoformat()
+                    and (data.departure_stop_sequence is None or item["stop_sequence"] == data.departure_stop_sequence)
+                    and item["pickup_type"] == 0]
+        if len(selected) != 1:
+            raise SearchError(422, "departure_not_available", "Wybrany kurs nie jest dostępny na tym słupku w podanym dniu i oknie czasowym.")
+        item = selected[0]
+        departure = datetime.fromisoformat(item["departure_at"])
+        evaluation = evaluate_transfer(arrival_at, departure, walking_minutes, data.delay_minutes)
+        results = [{"departure": item, "evaluation": asdict(evaluation)}]
         return {
             "is_realtime": False, "schedule_status": "planned", "timezone": "Europe/Warsaw",
-            "link": {**asdict(LINK), "walking_minutes": data.walking_minutes,
+            "link": {**asdict(link), "walking_minutes": walking_minutes,
+                     "walking_time_basis": "openrouteservice_cache", "walking": walking,
                      "arrival_stop": stop_data(arrival_stop), "departure_stop": stop_data(departure_stop)},
-            "arrival": {"operator": "skm", "stop_id": LINK.arrival_stop_id, "stop_name": arrival_stop["name"],
+            "arrival": {"operator": "skm", "stop_id": link.arrival_stop_id, "stop_name": arrival_stop["name"],
                         "trip_id": data.arrival_trip_id, "route_id": row["route_id"], "service_id": row["service_id"],
                         "service_date": data.arrival_service_date.isoformat(), "stop_sequence": row["stop_sequence"],
                         "line": row["short_name"] or row["long_name"], "direction": row["headsign"] or row["trip_headsign"] or None,
                         "gtfs_arrival_time": row["arrival_time"], "arrival_at": arrival_at.isoformat()},
             "simulated_delay_minutes": data.delay_minutes, "sources": [metadata["skm"], metadata["ztm"]],
             "search_window": {"start_at": arrival_at.isoformat(), "end_at_exclusive": end.astimezone(WARSAW).isoformat()},
-            "outcome": "evaluated" if results else "no_departures", "results": results,
-            "limit": data.limit, "has_more": len(selected) > data.limit,
-            "limitations": ["Dojście jest szacunkiem użytkownika; peron SKM i dostępność drogi nie są zweryfikowane.",
-                            "Plan B obejmuje tylko wskazany słupek, tę samą trasę, kierunek i dalszy przebieg w podanym oknie.",
-                            "Brak alternatywy oznacza brak zgodnego kursu w tym oknie; rozkład nie uwzględnia zmian realtime."],
+            "outcome": "evaluated", "results": results,
+            "limitations": ["Czas dojścia jest szacunkowy; peron SKM nie jest określony.", "Opóźnienie jest symulacją, rozkład nie zawiera danych realtime."],
         }

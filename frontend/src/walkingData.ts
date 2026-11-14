@@ -21,24 +21,6 @@ export interface WalkingResponse {
   estimate: WalkingEstimate | null
 }
 
-export interface WalkingInput {
-  pair: string
-  value: string
-  manual: boolean
-}
-
-export function selectWalkingPair(current: WalkingInput, pair: string): WalkingInput {
-  if (current.pair === pair) return current
-  // A value entered before the first pair loads is already an explicit user choice.
-  return current.pair === '' ? { ...current, pair } : { pair, value: '', manual: false }
-}
-
-export function applyWalkingEstimate(current: WalkingInput, pair: string, data: WalkingResponse): WalkingInput {
-  if (current.pair !== pair || current.manual) return current
-  if (data.status !== 'available' || data.estimate?.walking_minutes == null) return current.value === '' ? current : { ...current, value: '' }
-  return { ...current, value: String(data.estimate.walking_minutes) }
-}
-
 export function readWalking(value: unknown, from: string, to: string): WalkingResponse {
   const data = value as WalkingResponse | null
   if (!data || data.from_stop_id !== from || data.to_stop_id !== to || !['available', 'missing', 'stale', 'no_route'].includes(data.status)) {

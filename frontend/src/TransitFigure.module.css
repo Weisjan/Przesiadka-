@@ -1,13 +1,7 @@
-.figure { width: 200px; height: 208px; flex: none; overflow: visible; }
-.success { color: var(--ready); }
-.edge { color: var(--edge); }
-.missed, .idle, .loading, .error { color: var(--neutral); }
-.idle, .loading { opacity: .6; }
-.success .frontLeg { transform-origin: 74px 98px; animation: walk 1.8s ease-in-out infinite alternate; }
-.success .backLeg { transform-origin: 74px 98px; animation: walk 1.8s ease-in-out infinite alternate-reverse; }
-.edge .backLeg { transform-origin: 65px 91px; animation: run .65s ease-in-out infinite alternate; }
-.edge .arm { transform-origin: 91px 56px; animation: run .65s ease-in-out infinite alternate-reverse; }
-@keyframes walk { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
-@keyframes run { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
-@media (prefers-reduced-motion: reduce) { .figure * { animation: none !important; } }
-@media (max-width: 700px) { .figure { width: 152px; height: 164px; } }
+.figure { width: 208px; height: 208px; position: relative; flex: none; }
+.model { position: absolute; inset: 0; opacity: 0; transition: opacity 250ms linear; pointer-events: none; }
+.model svg { display: block; width: 100%; height: 100%; }
+.visible { opacity: 1; }
+.neutral { opacity: .3; }
+@media (prefers-reduced-motion: reduce) { .model { transition: none; } }
+@media (max-width: 700px) { .figure { width: 164px; height: 164px; } }
