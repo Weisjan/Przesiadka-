@@ -1,104 +1,101 @@
 # Przesiadka+
 
-A local full-stack MVP for planning an SKM train ride, an estimated walk and a ZTM connection in Gdańsk. Enter an origin, departure time and destination, then simulate how a train delay changes the transfer margin.
+A local full-stack application for planning an SKM train ride and a ZTM connection in Gdańsk. It selects an interchange, includes estimated walking time and shows how a simulated train delay changes the transfer margin.
 
 ## Demo
 
-[Watch or download the narrated demo (MP4, 2:45)](demo-video/final/przesiadka-demo-ai-voice.mp4)
+[Watch the demo with Polish narration and captions (MP4, 2:45)](demo-video/final/przesiadka-demo-ai-voice.mp4)
 
-The film shows the real Kinetic Transit interface and local API, followed by diagrams explaining the implementation. It has Polish AI narration and captions. Its timetable is archival, not live. [Production scripts and storyboard](demo-video/README.md) are included; clean masters, source recordings and TTS audio remain local.
+The film records the working Kinetic Transit interface using archival timetables from 13 November 2026. [Production scripts and storyboard](demo-video/README.md) are included.
 
 ## Features
 
-- Search SKM origin stations and ZTM destinations from imported GTFS records.
-- Automatically select an approved interchange and an exact ZTM boarding pole.
-- Compare up to three journeys using transfer margin and destination arrival.
-- Simulate 0?30 minutes of delay while keeping the selected courses fixed.
-- Display the result with animated SVG figures, keyboard controls and reduced-motion support.
-- Run three historical examples through the actual planner in a separate demo mode.
+- Choose an SKM origin, departure date/time and ZTM destination.
+- Find connections through approved walking links and exact ZTM boarding stops.
+- Compare up to three journeys, including destination arrival times.
+- Inspect estimated walking time and the remaining transfer margin.
+- Simulate 0 to 30 minutes of delay for the selected courses.
+- Follow the result through animated SVG figures and a responsive, keyboard-accessible Polish interface.
 
 ## Tech Stack
 
-| Layer | Technologies |
+| Area | Technologies |
 |---|---|
 | Frontend | React, TypeScript, Vite, CSS Modules, SVG/SMIL |
-| Backend | Python 3.13, FastAPI, Pydantic, uvicorn, uv |
-| Data | SQLite through Python `sqlite3`, static GTFS, OpenRouteService walking cache |
-| Tests | pytest/httpx, Node test runner, Playwright with Edge |
-| Video tools | Python, Playwright, FFmpeg/ffprobe |
+| Backend | Python 3.13, FastAPI, Pydantic, uvicorn; dependencies managed with uv |
+| Database | SQLite through Python's `sqlite3` |
+| Transit data | Locally imported SKM and ZTM Gdańsk GTFS |
+| Walking estimates | Saved directional OpenRouteService routes |
+| Testing | pytest/httpx, Node test runner, Playwright with Edge |
 
 ## How It Works
 
-`POST /api/transit/journeys/plan` searches candidate SKM departures and later stops of each exact train trip. It checks approved directional walks, then ZTM trips that reach the requested destination after the boarding stop. Walking estimates must be fresh and match the GTFS coordinates; fractional seconds are rounded up to minutes.
+The backend follows later stops of each candidate SKM trip and checks approved walking links to concrete ZTM stops. A connecting bus or tram must reach the destination later on that same trip. Walking estimates come from the local ORS cache and are rounded up to whole minutes.
 
-Ranking prefers at least two minutes of transfer margin, then earlier destination arrival, shorter journey duration and less waiting. The search covers a six-hour window. It does not infer walking links from matching names or select a preferred hub independently of the data.
+Within a six-hour search window, ranking prefers at least two minutes of transfer margin, then earlier destination arrival, shorter journey duration and less waiting. The current registry contains four directional links at Gdańsk Główny.
 
-The slider calls `POST /api/transit/transfers/search` for the same courses. A pure Python function calculates margin as scheduled departure minus arrival, simulated delay and walking time. It compares UTC instants while preserving Warsaw dates and offsets across midnight and DST. Cancellation and input identity checks protect the UI against stale responses.
-
-[Planner contract](docs/journey-planner.md) ? [Approved links and retained APIs](docs/transfer-links.md)
+A pure Python function calculates `margin = departure - (arrival + walking + delay)`, comparing UTC instants across midnight and Warsaw DST changes. The slider evaluates the same courses with a simulated delay. Request cancellation and response identity checks protect the UI against stale results. [Planner details](docs/journey-planner.md).
 
 ## Getting Started
 
-All commands below run in **Windows PowerShell from the repository root**. `package.json` is in `frontend/`.
+### Prerequisites and installation
 
-1. **Requirements:** Python 3.13, uv, Node.js 24+ and npm. Local checks used Node.js 26.13.0. Playwright and FFmpeg are optional tools for browser tests and video production, not application dependencies.
-2. **Install the locked application dependencies:**
+Use Windows PowerShell with Git, Python 3.13, uv, Node.js 24+ and npm installed.
 
-   ```powershell
-   uv sync --locked --directory backend
-   npm.cmd ci --prefix frontend
-   ```
-
-3. **Prepare local data:** regular mode requires SKM/ZTM imports in `backend/data/gtfs/transit.db` and saved walking estimates in `backend/data/walking.db`. Follow [GTFS import](docs/gtfs.md) and [walking setup](docs/walking.md). These are explicit CLI operations; ORS imports require a process-local API key. No key belongs in Git or the browser. For an existing historical bundle, use Demo Mode below instead.
-4. **Start the regular backend:**
-
-   ```powershell
-   uv run --no-sync --directory backend uvicorn app.main:app --host 127.0.0.1 --port 8000
-   ```
-
-5. **Start the frontend in a second terminal, also from the repository root:**
-
-   ```powershell
-   npm.cmd run dev --prefix frontend
-   ```
-
-6. **Open** <http://127.0.0.1:5173>. The API is at <http://127.0.0.1:8000>; `/api/health` checks server health and `/openapi.json` describes the endpoints. Swagger/ReDoc pages are disabled. Stop each server with Ctrl+C before switching modes.
-
-Alternate database paths use `PRZESIADKA_TRANSIT_PATH` and `PRZESIADKA_WALKING_PATH`. Startup and searches never download feeds or call ORS. A running server alone does not imply that usable timetable and walking data are installed.
-
-## Demo Mode
-
-The historical bundle covers **13 November 2026**, with departure searches from 16:00 to 18:00. **Zobacz przyk?ad** fills the form and runs the real backend:
-
-| Journey from Wrzeszcz at 17:00 | ZTM departure | Destination arrival | Initial margin |
-|---|---|---|---|
-| Strzy?a PKM | Tram 6, 17:15 | 17:36 | +3 min |
-| Lawendowe Wzg?rze | Tram 11, 17:13 | 17:37 | +2 min |
-| Przegalina | Bus 112, 17:16 | 18:21 | +5 min |
-
-Demo mode requires these local files, excluded from Git:
-
-```text
-backend/data/demo/transit.db
-backend/data/demo/walking.db
-backend/data/demo/manifest.json
+```powershell
+git clone --branch feature/gtfs-integration https://github.com/Weisjan/Przesiadka-.git PrzesiadkaPlus
+Set-Location .\PrzesiadkaPlus
+uv sync --locked --directory backend
+npm.cmd ci --prefix frontend
 ```
 
-With this bundle and application dependencies installed, replace the regular backend command with:
+Run all following commands from this repository root. The frontend's `package.json` is in `frontend/`.
+
+### Prepare local data
+
+Import both official static timetables:
+
+```powershell
+uv run --no-sync --directory backend python -m app.gtfs ztm
+uv run --no-sync --directory backend python -m app.gtfs skm
+```
+
+These commands download and import the feeds into `backend/data/gtfs/transit.db`. With an ORS key supplied through the process environment variable `ORS_API_KEY`, preview and calculate one supported walking link:
+
+```powershell
+uv run --no-sync --directory backend python -m app.walking skm:7500 ztm:2001 --dry-run
+uv run --no-sync --directory backend python -m app.walking skm:7500 ztm:2001 --max-requests 1
+```
+
+The second command contacts ORS and saves the estimate in `backend/data/walking.db`. Search uses the approved links with valid cached estimates. [GTFS imports](docs/gtfs.md) and [walking-cache setup](docs/walking.md) document paths, attribution and controlled imports for further pairs. Keep keys and provider databases local.
+
+### Start the application
+
+Start the API:
+
+```powershell
+uv run --no-sync --directory backend uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+In a second PowerShell terminal at the repository root, start the frontend:
+
+```powershell
+npm.cmd run dev --prefix frontend
+```
+
+Open <http://127.0.0.1:5173>. API health is at <http://127.0.0.1:8000/api/health> and its schema at <http://127.0.0.1:8000/openapi.json>. Stop servers with Ctrl+C.
+
+### Historical presentation mode
+
+The recorded examples use `backend/data/demo/transit.db`, `walking.db` and `manifest.json`. This local bundle is excluded from Git. Rebuilding it with `app.demo prepare` requires existing official imports covering 13 November 2026 and the saved walking estimates; current feeds may cover different dates. [Demo preparation and provenance](docs/demo.md).
+
+With the bundle present, use this command instead of the regular API command:
 
 ```powershell
 uv run --no-sync --directory backend python -m app.demo serve
 ```
 
-Use the same frontend command and URL. Confirm the archival-demo banner. Demo mode evaluates cache freshness at its recorded reference time; regular mode still rejects expired estimates. Examples supply search inputs, not fabricated API responses.
-
-**A fresh clone cannot reproduce this historical demo by itself.** `app.demo prepare` can build a separate bundle only from existing official local imports covering that date and the required saved walking estimates:
-
-```powershell
-uv run --no-sync --directory backend python -m app.demo prepare
-```
-
-Run preparation once, only when those inputs exist and the output directory is absent. It makes no network requests and refuses to overwrite a bundle. Current public feeds may no longer contain these historical records. No public historical data bundle or guaranteed historical-download procedure is provided. [Preparation, provenance and redistribution conditions](docs/demo.md) explain the remaining data requirements.
+Use the same frontend command. The archival banner identifies this mode. **Zobacz przykład** runs the planner for Wrzeszcz to Strzyża PKM, Lawendowe Wzgórze or Przegalina. Departure searches cover 13 November 2026, 16:00 to 18:00; delays remain simulated.
 
 ## Testing
 
@@ -111,26 +108,8 @@ npm.cmd run typecheck --prefix frontend
 npm.cmd run build --prefix frontend
 ```
 
-Backend tests use temporary SQLite databases and synthetic provider/feed fixtures without live ORS calls. Frontend tests use Node's test runner; build includes TypeScript checking.
-
-For browser tests, start Vite first, then use an existing Python environment with Playwright and Edge:
-
-```powershell
-$BrowserPython = Read-Host 'Path to python.exe with Playwright installed'
-& $BrowserPython -B .\frontend\tests\stop_selection_browser.py
-```
-
-These tests use synthetic API responses, without user database access. They check selection, alternatives, stale responses, keyboard interaction, mobile/desktop geometry and SVG motion. Real-data demo verification is a separate check.
+Tests use temporary databases and synthetic provider fixtures. The [browser suite](frontend/tests/stop_selection_browser.py) checks interaction, stale responses, responsive layout and SVG motion using an existing Playwright/Edge installation.
 
 ## AI-Assisted Development
 
-I used OpenAI Codex to help implement the backend and frontend, write tests and documentation, and automate browser checks and video production. I defined the scope, data constraints and visual direction, reviewed the proposed changes, and made decisions about the MVP and its limitations. I verified changes with automated tests and browser checks.
-
-The actual [AGENTS.md](AGENTS.md) and [local skill instructions](.agents/skills) are versioned. They include guidance for small changes, frontend design, planning, concise reporting, code review and demo verification. [Humanizer 4.0.0](.agents/skills/humanizer/SKILL.md) was used to edit README prose, the film narration and captions without changing technical facts; its instructions and MIT license are included. Playwright controlled the real browser, and FFmpeg assembled the recordings and captions. The journey planner itself uses deterministic timetable and transfer calculations.
-
-## Scope and data quality
-
-- The planner compares one SKM ride, a directional walk and one ZTM ride through four approved links at Gdańsk Główny.
-- Demo journeys use archival timetables. The delay slider simulates the effect of a late train on the selected connection.
-- Walking times are estimates based on saved OpenRouteService routes. Actual access from an SKM platform can vary.
-- Searches require timetable coverage and fresh walking-cache entries. Local data are refreshed through explicit CLI commands.
+OpenAI Codex supported implementation, tests, refactoring and browser/video automation. I defined the product flow, technical constraints and visual direction, reviewed changes and used tests to verify behaviour. The [agent instructions](AGENTS.md) and [project skills](.agents/skills) are versioned. Humanizer 4.0.0 helped edit README prose, film narration and captions; Playwright and FFmpeg automated the recording and montage.
