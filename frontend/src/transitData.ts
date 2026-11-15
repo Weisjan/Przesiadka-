@@ -12,6 +12,7 @@ export interface TransitSource {
   service_end_date?: string
   downloaded_at?: string | null
   imported_at?: string
+  sha256?: string
   attribution: string
   documentation_url: string
 }
@@ -102,7 +103,7 @@ export const stopLabel = (stop: TransitStop) => `${stop.stop_name} · ${stop.sto
 export const transportName = (type: number) => type === 0 || (type >= 900 && type < 1000) ? 'Tramwaj'
   : type === 3 || (type >= 700 && type < 800) ? 'Autobus' : type === 2 || (type >= 100 && type < 200) ? 'Kolej' : 'Przejazd'
 
-function validJourney(value: unknown): value is Journey {
+export function validJourney(value: unknown): value is Journey {
   if (!record(value)) return false
   return ['skm', 'ztm'].includes(String(value.operator))
     && ['operator_name', 'stop_id', 'stop_name', 'trip_id', 'route_id', 'line', 'service_id', 'service_date'].every(key => typeof value[key] === 'string' && value[key] !== '')

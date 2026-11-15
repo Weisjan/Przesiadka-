@@ -12,7 +12,11 @@ def get_walking_transfer(request: Request,
                          from_stop_id: str = Query(pattern=r"^(skm|ztm):.+$", max_length=260),
                          to_stop_id: str = Query(pattern=r"^(skm|ztm):.+$", max_length=260)):
     try:
-        return lookup(request.app.state.walking_database_path, request.app.state.transit_database_path, from_stop_id, to_stop_id)
+        result = lookup(request.app.state.walking_database_path, request.app.state.transit_database_path, from_stop_id, to_stop_id,
+                        now=request.app.state.walking_reference_at)
+        if request.app.state.demo:
+            result["demo"] = request.app.state.demo
+        return result
     except WalkingError as error:
         status = 404 if error.code == "stop_not_found" else 422 if error.code in ("invalid_pair", "invalid_stop", "invalid_coordinates") else 503
         raise HTTPException(status_code=status, detail={"code": error.code, "message": str(error)}) from error

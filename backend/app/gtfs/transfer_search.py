@@ -83,14 +83,14 @@ def linked_stops(connection, link: TransferLink = LINK):
     return stops
 
 
-def walking_for_link(path: Path, walking_path: Path | None, link: TransferLink, arrival, departure) -> dict:
+def walking_for_link(path: Path, walking_path: Path | None, link: TransferLink, arrival, departure, now: datetime | None = None) -> dict:
     if walking_path is None:
         return {"status": "missing", "from_stop_id": link.arrival_stop_id, "to_stop_id": link.departure_stop_id, "estimate": None}
     points = (coordinates(arrival["longitude"], arrival["latitude"]), coordinates(departure["longitude"], departure["latitude"]))
-    return walking_lookup(walking_path, path, link.arrival_stop_id, link.departure_stop_id, points=points)
+    return walking_lookup(walking_path, path, link.arrival_stop_id, link.departure_stop_id, now=now, points=points)
 
 
-def transfer_links(path: Path, walking_path: Path | None = None) -> dict:
+def transfer_links(path: Path, walking_path: Path | None = None, walking_at: datetime | None = None) -> dict:
     with read_connection(path) as connection:
         connection.execute("BEGIN")
         links, unavailable = [], []
@@ -101,7 +101,7 @@ def transfer_links(path: Path, walking_path: Path | None = None) -> dict:
                 unavailable.append({"id": link.id, **error.detail})
                 continue
             try:
-                walking = walking_for_link(path, walking_path, link, arrival, departure)
+                walking = walking_for_link(path, walking_path, link, arrival, departure, walking_at)
             except WalkingError as error:
                 walking = {"status": "error", "message": str(error)}
             links.append({**asdict(link), "arrival_stop": stop_data(arrival), "departure_stop": stop_data(departure), "walking": walking})
@@ -176,13 +176,13 @@ def resolve_arrival(connection, stop_id: str, trip_id: str, service_day: date, s
     return row, arrival_at
 
 
-def search_transfers(path: Path, data: TransferSearchInput, walking_path: Path | None = None) -> dict:
+def search_transfers(path: Path, data: TransferSearchInput, walking_path: Path | None = None, walking_at: datetime | None = None) -> dict:
     link = find_link(data.link_id)
     with read_connection(path) as connection:
         # Keep both providers, calendars and patterns in one read-only snapshot.
         connection.execute("BEGIN")
         arrival_stop, departure_stop = linked_stops(connection, link)
-        walking = walking_for_link(path, walking_path, link, arrival_stop, departure_stop)
+        walking = walking_for_link(path, walking_path, link, arrival_stop, departure_stop, walking_at)
         if walking["status"] != "available":
             raise SearchError(422, "walking_time_unavailable", "Brak aktualnego szacunku dojścia dla tej pary.", walking_status=walking["status"])
         walking_minutes = walking["estimate"]["walking_minutes"]

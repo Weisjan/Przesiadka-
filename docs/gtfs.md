@@ -1,6 +1,6 @@
 # Static GTFS integration
 
-The current four-pair registry, approval audit and extended API contract are documented in [approved transfer links](transfer-links.md). Search uses exact selected courses and cached walking time. `/journeys` accepts `link_id`, defaulting to the original pair. The frontend accepts an SKM train and a ZTM goal. `/transfers/suggest` ranks matching courses across approved boarding stops.
+The screen uses the [one-transfer journey planner](journey-planner.md): SKM origin, departure date/time and ZTM destination. The four-pair registry and retained selected-course APIs are documented in [approved transfer links](transfer-links.md). `/journeys`, `/transfers/suggest` and `/transfers/search` remain available; simulation reuses exact courses and cached walking time.
 
 This extension imports official timetable ZIP files explicitly. It does not fetch feeds during FastAPI startup or API requests, provide realtime information, or change the transfer evaluation algorithm. The screen selects actual courses for approved links.
 

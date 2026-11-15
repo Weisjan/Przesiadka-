@@ -1,0 +1,69 @@
+.planner { min-width: 0; }
+.form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .9fr) minmax(0, 1fr); gap: 12px 28px; margin-bottom: 12px; }
+.stopPicker { min-width: 0; }
+.stopPicker > label, .when legend { display: block; color: var(--slate); font-size: 14px; margin-bottom: 8px; }
+.stopPicker input { width: 100%; }
+.when { min-width: 0; padding: 0; margin: 0; border: 0; }
+.when label { min-width: 0; font-size: 13px; }
+.dateTime { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 8px; }
+.dateTime input { width: 100%; min-width: 0; padding-inline: 8px; }
+.fieldHint { font-size: 12px; color: var(--slate); line-height: 1.5; margin: 8px 0 0; min-height: 18px; }
+.fieldHint button { margin-top: 8px; }
+.searchAction { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.searchAction p { font-size: 13px; color: var(--slate); margin: 0; max-width: 65ch; }
+.searchAction button { flex: none; }
+.notice { color: var(--slate); font-size: 14px; min-height: 40px; padding: 8px 0; }
+.notice[role='alert'] { color: var(--edge); }
+.notice:empty { display: none; }
+.selectedGoal { font-size: 16px; color: var(--ink); overflow-wrap: anywhere; }
+.editSearch { display: none; }
+.demo { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding: 0 0 16px; margin-bottom: 20px; }
+.demo p { font-size: 13px; color: var(--slate); margin: 0; }
+.demo button { font-size: 13px; }
+.demoExamples { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.demoExamples button { text-align: left; }
+.demoExamples strong, .demoExamples span { display: block; }
+.demoExamples strong { font-weight: 500; }
+.demoExamples span { color: var(--slate); margin-top: 8px; }
+.summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; border-top: 1px solid var(--line); padding: 12px 0 20px; font-size: 13px; color: var(--slate); background: var(--paper); }
+.summary p { margin-bottom: 8px; }
+.summary button { font-size: 14px; }
+.alternatives { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.alternatives button { text-align: left; white-space: normal; }
+.alternatives span, .alternatives strong { display: block; font-size: 13px; overflow-wrap: anywhere; }
+.alternatives strong { font-weight: 500; color: var(--ink); }
+.alternatives span { color: var(--slate); margin-top: 8px; }
+.planner .journeyCard { display: flex; min-height: 330px; }
+.journeyCard .legStart { margin-bottom: 24px; }
+.legStart > span { font-size: 12px; color: var(--slate); }
+.legStart p { font-size: 17px; margin: 4px 0; overflow-wrap: anywhere; }
+.legStart summary { font-size: 22px; min-height: 40px; }
+.legStart details p { font-size: 12px; color: var(--slate); }
+.details { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 24px; color: var(--slate); font-size: 13px; }
+.details details p { max-width: 76ch; margin-top: 12px; }
+@media (max-width: 1000px) {
+  .summary { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .compact .form { display: none; }
+  .editSearch { display: inline-block; }
+  .form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .when { grid-column: 1 / -1; grid-row: 2; }
+  .dateTime { width: min(100%, 420px); }
+  .alternatives { grid-template-columns: minmax(0, 1fr); }
+  .planner .analysis { grid-row: 1; }
+  .planner .simulation { grid-row: 2; }
+  .planner .journeyCard { grid-row: 3; min-height: 300px; }
+}
+@media (max-width: 600px) {
+  .summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .summary > div:first-child { grid-column: 1 / -1; }
+  .demoExamples { grid-template-columns: minmax(0, 1fr); }
+  .form { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .when { grid-row: auto; }
+  .fieldHint { min-height: 0; }
+  .searchAction { align-items: stretch; flex-direction: column; gap: 12px; }
+  .planner .journeyCard { grid-column: 1; }
+  .planner .journeyCard:last-of-type { grid-row: 4; }
+  .planner .analysis { min-height: 320px; }
+  .planner .journeyCard .legHeading h2 { display: block; }
+  .planner .journeyCard .endTime { border-top: 1px solid var(--line); flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; }
+}

@@ -11,7 +11,9 @@
 
 All audited stops have location_type=0. Approval uses exact IDs and scheduled boarding occurrences. Physical SKM platforms and access paths remain unverified. Cache values are read at request time.
 
-## Screen contract
+## Selected-course API (retained)
+
+The current screen uses the [origin-to-destination planner](journey-planner.md). The endpoints below remain available, and the planner screen reuses `/transfers/search` for delay simulation. The selected-train UI described below is the earlier interaction model.
 
 `GET /api/transit/journeys` takes `leg`, `date`, optional `link_id`, and optional departure `after`. Dates are civil Warsaw dates; occurrences retain service date and stop sequence. Omitting link_id selects the original 2001 pair.
 

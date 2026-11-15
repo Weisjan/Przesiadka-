@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='utf-8'?>
+<speak xmlns="http://www.w3.org/2001/10/synthesis" version="1.0" xml:lang="pl-PL">
+  <p>Wybieram Wrzeszcz, godzinę i Przegalinę. Aplikacja dobiera kursy, miejsce przesiadki i dojście.<break time="250ms" />
+  </p>
+  <p>To archiwalny rozkład z trzynastego listopada dwa tysiące dwudziestego szóstego roku.<break time="250ms" />
+  </p>
+  <p>SKM odjeżdża o siedemnastej zero dwa i dociera do Gdańska Głównego siedem minut później.<break time="250ms" />
+  </p>
+  <p>Dalej jest autobus sto dwanaście o siedemnastej szesnaście. Do Przegaliny docieram planowo o osiemnastej dwadzieścia jeden.<break time="250ms" />
+  </p>
+  <p>Po dwóch minutach szacowanego dojścia zostaje pięć minut zapasu. Nie wybieram ręcznie słupka.<break time="250ms" />
+  </p>
+  <p>Bez opóźnienia postać spokojnie idzie. Suwak ocenia te same kursy, bez zmiany planu.<break time="250ms" />
+  </p>
+  <p>Cztery minuty opóźnienia zostawiają jedną minutę zapasu. Postać zaczyna biec.<break time="250ms" />
+  </p>
+  <p>Przy pięciu minutach zapas wynosi zero.<break time="250ms" />
+  </p>
+  <p>Sześć minut oznacza spóźnienie na ten autobus. Opóźnienie jest wyłącznie symulowane.<break time="250ms" />
+  </p>
+  <p>Napisałem własny planer w Pythonie. Sprawdza dalsze postoje konkretnego pociągu.<break time="250ms" />
+  </p>
+  <p>Porównuje zatwierdzone przejścia i dokładne słupki ZTM. Potem sprawdza dalszą trasę wybranego autobusu.<break time="250ms" />
+  </p>
+  <p>Cel musi występować na tym samym kursie, po przystanku wejścia.<break time="250ms" />
+  </p>
+  <p>Planer uwzględnia dojście i oblicza zapas. Preferuje warianty z zapasem co najmniej dwóch minut.<break time="250ms" />
+  </p>
+  <p>W tej grupie liczy się czas dotarcia do celu.<break time="250ms" />
+  </p>
+  <p>React i TypeScript odpowiadają za interfejs. FastAPI udostępnia REST API i waliduje dane.<break time="250ms" />
+  </p>
+  <p>Samą ocenę zapasu wydzieliłem do czystej funkcji. Mogę testować ją bez serwera i bazy.<break time="250ms" />
+  </p>
+  <p>Rozkłady SKM i ZTM importuję z oficjalnych plików GTFS do lokalnego SQLite.<break time="250ms" />
+  </p>
+  <p>Dojście pochodzi z cache OpenRouteService. Suwak nie odpytuje tej usługi.<break time="250ms" />
+  </p>
+  <p>Szacunek zaokrąglam w górę do minut. Nieaktualny wpis wyklucza przejście.<break time="250ms" />
+  </p>
+  <p>Testuję backend, frontend i przeglądarkę, także kalendarze, północ i zmianę czasu.<break time="250ms" />
+  </p>
+  <p>MVP porównuje cztery zatwierdzone przejścia przy Gdańsku Głównym. Nie jest pełnym planerem Trójmiasta.<break time="250ms" />
+  </p>
+  <p>To dane archiwalne, bez rzeczywistych opóźnień. Dojście pozostaje szacunkiem, a nie zweryfikowanym czasem od peronu.<break time="250ms" />
+  </p>
+</speak>

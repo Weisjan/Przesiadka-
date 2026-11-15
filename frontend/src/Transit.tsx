@@ -1,191 +1,203 @@
-import { useEffect, useId, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import { request } from './api'
-import { clock, fullDate, timeHints } from './dates'
+import { clock, dateTimeOptions, fromIso, fullDate, timeHints } from './dates'
+import { readAvailability } from './demoData'
+import type { Availability, DemoExample } from './demoData'
 import { durationParts, figureState } from './formatting'
-import { journeyKey, readSearch, readSetup, readSuggestions, searchInput, suggestionInput, transportName } from './transitData'
-import type { Journey, SearchResponse, SuggestedTransfer, SuggestionsResponse, TransferLink, TransitSource, TransitStop } from './transitData'
+import { planIdentity, readPlan, readPlannedEvaluation } from './plannerData'
+import type { PlanInput, PlannedJourney, PlanResponse, StopGroup } from './plannerData'
+import { searchInput, transportName } from './transitData'
+import type { SearchResponse } from './transitData'
+import StopPicker from './StopPicker'
 import TransitFigure from './TransitFigure'
-import JourneyPicker from './JourneyPicker'
 import styles from './Transit.module.css'
+import layout from './Planner.module.css'
 
-function CourseCard({ arrival, journey, stop, control, delay, disabled, onChoose, expanded, children, reference }: {
-  arrival: boolean; journey: Journey | null; stop?: TransitStop; control?: ReactNode; delay: number
-  disabled: boolean; onChoose: () => void; expanded?: boolean; children?: ReactNode; reference?: string
-}) {
-  const instant = arrival ? journey?.arrival_at : journey?.departure_at
-  const hints = instant ? timeHints(instant, reference ?? instant, [instant, ...(reference ? [reference] : [])]) : []
-  return <section className={`${styles.courseCard} ${arrival ? styles.arrivalCard : styles.departureCard}`}
-    aria-label={arrival ? 'Twój pociąg SKM' : 'Sugerowana przesiadka ZTM'}>
-    <div className={styles.station}>{control ?? <><span className={styles.stationLabel}>Stacja przyjazdu</span>
-      <p className={styles.stop}>{stop?.stop_name ?? 'Wczytywanie stacji…'}</p></>}</div>
-    <div className={styles.cardHeading}><h2>{arrival ? 'SKM Trójmiasto' : 'ZTM Gdańsk'}</h2>
-      <button disabled={disabled} onClick={onChoose} aria-expanded={expanded}>
-        {arrival ? journey ? 'Zmień pociąg' : 'Wybierz pociąg' : 'Inny kurs'} <span aria-hidden="true">↗</span>
-      </button></div>
-    <p className={styles.line}>{journey ? <>{journey.line} <span>{journey.operator === 'skm' ? journey.line === 'SKM' ? '' : 'SKM' : transportName(journey.route_type)}</span></> : '—'}</p>
-    <p className={styles.direction}>{journey ? `Kierunek: ${journey.direction ?? 'niepodany w rozkładzie'}` : arrival ? 'Wybierz pociąg z lokalnego rozkładu.' : 'Propozycja pojawi się po wyborze celu.'}</p>
-    {!arrival && journey && <p className={styles.stop}>{stop?.stop_name}</p>}
-    {arrival && journey && <p className={styles.delayHint}>+{delay} min · symulacja opóźnienia</p>}
-    {children}
-    <div className={styles.cardTime}><span>{arrival ? 'Przyjazd' : 'Odjazd'}</span>
-      {instant ? <details><summary aria-label={`${arrival ? 'Planowany przyjazd' : 'Planowany odjazd'} ${clock(instant)}. ${hints.join(', ')}`}>
-        <time dateTime={instant}>{clock(instant)}</time></summary><p>{fullDate(instant)}<br />Dzień kursowania: {journey?.service_date}</p></details>
-        : <span className={styles.unsetTime}>—:—</span>}
-    </div>
-    {hints.length > 0 && <p className={styles.timeHint}>{hints.join(' / ')}</p>}
+const notices: Record<string, string> = {
+  no_skm: 'Brak odjazdów SKM z tej stacji w ciągu 6 godzin. Wybierz inną godzinę.',
+  no_transfer_link: 'Na dalszej trasie tych pociągów nie ma obsługiwanej, zatwierdzonej przesiadki ZTM.',
+  walking_unavailable: 'Brak aktualnego szacunku dojścia na dostępnych przesiadkach. Wybierz inną podróż lub zaktualizuj lokalne dane.',
+  no_destination_service: 'Nie znaleziono kursu do tego celu wśród obsługiwanych przesiadek i w oknie 6 godzin.',
+  no_reachable: 'Nie ma osiągalnej przesiadki do tego celu w oknie 6 godzin. Spróbuj wcześniejszej godziny.',
+}
+const labels = { success: 'Masz zapas', edge: 'Na styk', missed: 'Nie zdążysz', idle: 'Twoja przesiadka' }
+
+function EventTime({ value, reference }: { value: string; reference: string }) {
+  const hints = timeHints(value, reference, [value, reference])
+  return <details><summary aria-label={`Szczegóły godziny ${clock(value)}`}><time dateTime={value}>{clock(value)}</time>
+    {hints.length > 0 && <span className={styles.timeHint}> {hints.join(' / ')}</span>}</summary><p>{fullDate(value)}</p></details>
+}
+
+function JourneyCard({ plan, arrival, reference }: { plan: PlannedJourney | null; arrival: boolean; reference: string }) {
+  const start = arrival ? plan?.origin : plan?.departure
+  const finish = arrival ? plan?.arrival : plan?.destination
+  return <section className={`${styles.courseCard} ${arrival ? styles.arrivalCard : styles.departureCard} ${layout.journeyCard}`}
+    aria-label={arrival ? 'Twój przejazd SKM' : 'Twój przejazd ZTM'}>
+    <div className={`${styles.cardHeading} ${layout.legHeading}`}><h2>{arrival ? 'SKM Trójmiasto' : 'ZTM Gdańsk'}</h2></div>
+    <p className={styles.line}>{start ? <>{start.line} {arrival ? '' : transportName(start.route_type)}</> : '—'}</p>
+    <p className={styles.direction}>{start ? `Kierunek: ${start.direction ?? 'niepodany w rozkładzie'}` : arrival ? 'Wskaż skąd i kiedy wyruszasz.' : 'Wybierz cel podróży.'}</p>
+    <div className={layout.legStart}><span>{arrival ? 'Wsiadasz' : 'Po dojściu wsiadasz'}</span>
+      <p>{start?.stop_name ?? '—'}</p>{start?.departure_at && <EventTime value={start.departure_at} reference={reference} />}</div>
+    <div className={`${styles.cardTime} ${layout.endTime}`}><span>{arrival ? 'Przesiadasz się' : 'Docierasz do celu'}<br />{finish?.stop_name}</span>
+      {finish?.arrival_at ? <EventTime value={finish.arrival_at} reference={reference} /> : <span className={styles.unsetTime}>—:—</span>}</div>
   </section>
 }
 
-const labels = { success: 'Masz zapas', edge: 'Na styk', missed: 'Nie zdążysz', idle: 'Twoja przesiadka' }
-
 export default function Transit() {
-  const [setup, setSetup] = useState<{ link?: TransferLink; links?: TransferLink[]; sources?: TransitSource[]; error?: string } | null>(null)
-  const [setupAttempt, setSetupAttempt] = useState(0)
-  const [arrival, setArrival] = useState<Journey | null>(null)
-  const [picker, setPicker] = useState(false)
-  const [query, setQuery] = useState('')
-  const [suggestionAttempt, setSuggestionAttempt] = useState(0)
-  const [suggestions, setSuggestions] = useState<{ key: string; data?: SuggestionsResponse; error?: string } | null>(null)
-  const [chosen, setChosen] = useState<{ key: string; item: SuggestedTransfer } | null>(null)
-  const [alternativesOpen, setAlternativesOpen] = useState(false)
+  const initial = fromIso(new Date().toISOString())
+  const [origin, setOrigin] = useState<StopGroup | null>(null)
+  const [destination, setDestination] = useState<StopGroup | null>(null)
+  const [day, setDay] = useState(initial.date)
+  const [time, setTime] = useState(initial.time)
+  const [offset, setOffset] = useState('')
+  const [submitted, setSubmitted] = useState<{ key: string; input: PlanInput; attempt: number } | null>(null)
+  const [reply, setReply] = useState<{ key: string; data?: PlanResponse; error?: string } | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [alternatives, setAlternatives] = useState(false)
   const [delay, setDelay] = useState(0)
-  const [response, setResponse] = useState<{ key: string; courseKey: string; data?: SearchResponse; error?: string } | null>(null)
+  const [evaluation, setEvaluation] = useState<{ key: string; course: string; data?: SearchResponse; error?: string } | null>(null)
+  const [availability, setAvailability] = useState<Availability | null>(null)
+  const [availabilityError, setAvailabilityError] = useState('')
+  const [availabilityAttempt, setAvailabilityAttempt] = useState(0)
+  const [exampleVersion, setExampleVersion] = useState(0)
+  const [examplesOpen, setExamplesOpen] = useState(false)
+  const [editing, setEditing] = useState(true)
+  const resultSummary = useRef<HTMLDivElement>(null)
+  const userEdited = useRef(false)
   const id = useId()
-  const base = arrival && setup?.links ? JSON.stringify({ ...suggestionInput(arrival, query), arrival_at: arrival.arrival_at, suggestionAttempt }) : ''
-  const currentSuggestions = base && suggestions?.key === base ? suggestions : null
-  const offers = currentSuggestions?.data
-  const selected = chosen?.key === base ? chosen.item : null
-  const link = selected?.link
-  const departure = selected?.departure ?? null
-  const payload = selected && arrival ? searchInput(selected.link, arrival, selected.departure, delay) : null
-  const courseKey = selected && arrival ? JSON.stringify({ base, link: selected.link.id, arrival_at: arrival.arrival_at,
-    departure: journeyKey(selected.departure), departure_at: selected.departure.departure_at, walking: selected.link.walking_minutes }) : ''
-  const key = payload ? JSON.stringify({ courseKey, ...payload }) : ''
-  const current = key && response?.key === key ? response : null
-  const result = current?.data?.results[0]?.evaluation
-  const error = current?.error
-  const pending = !!payload && !current
-  // Keep only the figure's last pose during a same-course calculation. Numeric results always use the current request key.
+  const options = dateTimeOptions({ date: day, time, offset: '' })
+  const input: PlanInput | null = origin && destination && options.length && (options.length === 1 || offset)
+    ? { origin_stop_ids: origin.stops.map(s => s.stop_id).sort(), destination_stop_ids: destination.stops.map(s => s.stop_id).sort(),
+      departure_date: day, departure_time: time, departure_offset: options.length > 1 ? offset : options[0].slice(-6), max_results: 3 } : null
+  const inputKey = input ? JSON.stringify(input) : ''
+  const current = submitted?.key === inputKey && reply?.key === submitted.key ? reply : null
+  const data = current?.data
+  const plan = data?.results[selectedIndex] ?? null
+  const course = plan ? `${inputKey}:${planIdentity(plan)}` : ''
+  const payload = plan ? searchInput(plan.link, plan.arrival, plan.departure, delay) : null
+  const evaluationKey = payload ? JSON.stringify({ course, ...payload }) : ''
+  const evaluated = evaluation?.key === evaluationKey ? evaluation : null
+  const result = evaluated?.data?.results[0]?.evaluation
+  const error = evaluated?.error
+  const pending = !!plan && !evaluated
   const figureMargin = error ? null : result?.margin_minutes
-    ?? (courseKey && response?.courseKey === courseKey ? response.data?.results[0]?.evaluation.margin_minutes : null) ?? null
-  const state = figureState(result?.margin_minutes ?? null)
+    ?? (evaluation?.course === course ? evaluation.data?.results[0]?.evaluation.margin_minutes : null) ?? null
   const margin = result ? durationParts(result.margin_minutes) : null
-  const walking = selected?.link.walking.estimate
-  const recommended = offers?.recommendation
-  const isRecommended = selected && recommended && selected.link.id === recommended.link.id
-    && journeyKey(selected.departure) === journeyKey(recommended.departure)
+  const state = figureState(result?.margin_minutes ?? null)
+  const searching = !!submitted && submitted.key === inputKey && !current
 
+  function invalidate() {
+    userEdited.current = true
+    setSubmitted(null); setReply(null); setSelectedIndex(0); setAlternatives(false); setEvaluation(null)
+    setEditing(true)
+  }
   useEffect(() => {
     const controller = new AbortController()
     let disposed = false
-    setSetup(null)
-    Promise.all([
-      request<unknown>('/api/transit/sources', { signal: controller.signal }),
-      request<unknown>('/api/transit/transfer-links', { signal: controller.signal }),
-    ]).then(([sources, links]) => {
-      const data = readSetup(sources, links)
-      if (!disposed) setSetup(data)
-    }).catch((error: Error) => { if (!disposed) setSetup({ error: error.message }) })
+    setAvailabilityError('')
+    request<unknown>('/api/transit/sources', { signal: controller.signal }).then(readAvailability).then(data => {
+      if (disposed) return
+      setAvailability(data)
+      if (data.demo && !userEdited.current) { setDay(data.demo.departure_date); setTime('17:00'); setOffset('') }
+    }).catch((error: Error) => { if (!disposed) setAvailabilityError(error.message) })
     return () => { disposed = true; controller.abort() }
-  }, [setupAttempt])
-
+  }, [availabilityAttempt])
   useEffect(() => {
-    if (!base || !arrival || !setup?.links) return
+    if (!data?.results.length) return
+    setEditing(false)
+  }, [data])
+  useEffect(() => {
+    if (!data?.results.length || editing || !window.matchMedia('(max-width: 1000px)').matches) return
+    const frame = window.requestAnimationFrame(() => {
+      resultSummary.current?.focus({ preventScroll: true })
+      resultSummary.current?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [data, editing])
+  useEffect(() => {
+    if (!submitted || submitted.key !== inputKey) return
     const controller = new AbortController()
     let disposed = false
-    const timer = window.setTimeout(() => {
-      request<unknown>('/api/transit/transfers/suggest', { method: 'POST', signal: controller.signal,
-        body: JSON.stringify(suggestionInput(arrival, query)) })
-        .then(value => readSuggestions(value, arrival, query, setup.links!))
-        .then(data => {
-          if (disposed) return
-          setSuggestions({ key: base, data })
-          setChosen(data.recommendation ? { key: base, item: data.recommendation } : null)
-        })
-        .catch((error: Error) => { if (!disposed) setSuggestions({ key: base, error: error.message }) })
-    }, 180)
-    return () => { disposed = true; controller.abort(); window.clearTimeout(timer) }
-  }, [base])
-
-  useEffect(() => {
-    if (!payload || !selected || !arrival) return
-    const controller = new AbortController()
-    let disposed = false
-    request<unknown>('/api/transit/transfers/search', { method: 'POST', signal: controller.signal, body: JSON.stringify(payload) })
-      .then(value => readSearch(value, selected.departure, arrival, selected.link, selected.link.walking_minutes))
-      .then(data => { if (!disposed) setResponse({ key, courseKey, data }) })
-      .catch((error: Error) => { if (!disposed) setResponse({ key, courseKey, error: error.message }) })
+    request<unknown>('/api/transit/journeys/plan', { method: 'POST', body: JSON.stringify(submitted.input), signal: controller.signal })
+      .then(value => readPlan(value, submitted.input))
+      .then(data => { if (!disposed) setReply({ key: submitted.key, data }) })
+      .catch((error: Error) => { if (!disposed) setReply({ key: submitted.key, error: error.message }) })
     return () => { disposed = true; controller.abort() }
-  }, [key])
-
-  function resetSelection() {
-    setChosen(null)
-    setResponse(null)
-    setDelay(0)
-    setAlternativesOpen(false)
+  }, [submitted, inputKey])
+  useEffect(() => {
+    if (!plan || !payload || !data) return
+    const controller = new AbortController()
+    let disposed = false
+    request<unknown>('/api/transit/transfers/search', { method: 'POST', body: JSON.stringify(payload), signal: controller.signal })
+      .then(value => readPlannedEvaluation(value, plan, data.sources))
+      .then(data => { if (!disposed) setEvaluation({ key: evaluationKey, course, data }) })
+      .catch((error: Error) => { if (!disposed) setEvaluation({ key: evaluationKey, course, error: error.message }) })
+    return () => { disposed = true; controller.abort() }
+  }, [evaluationKey])
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    if (!input) return
+    setReply(null); setSelectedIndex(0); setAlternatives(false); setEvaluation(null)
+    setSubmitted({ key: inputKey, input, attempt: (submitted?.attempt ?? 0) + 1 })
+  }
+  function chooseExample(example: DemoExample) {
+    userEdited.current = true
+    const value: PlanInput = { origin_stop_ids: example.origin.stops.map(s => s.stop_id).sort(), destination_stop_ids: example.destination.stops.map(s => s.stop_id).sort(),
+      departure_date: example.departure_date, departure_time: example.departure_time,
+      departure_offset: dateTimeOptions({ date: example.departure_date, time: example.departure_time, offset: '' })[0].slice(-6), max_results: 3 }
+    setOrigin(example.origin); setDestination(example.destination); setDay(example.departure_date); setTime(example.departure_time); setOffset('')
+    setDelay(0); setReply(null); setEvaluation(null); setSelectedIndex(0); setAlternatives(false); setExamplesOpen(false)
+    setExampleVersion(x => x + 1)
+    setSubmitted({ key: JSON.stringify(value), input: value, attempt: (submitted?.attempt ?? 0) + 1 })
   }
 
-  function changeQuery(value: string) {
-    if (value.trim() !== query.trim()) resetSelection()
-    setQuery(value)
-  }
-
-  const suggestionNotice = !arrival ? 'Najpierw wybierz pociąg SKM.' : !currentSuggestions ? 'Sprawdzanie dostępnych przesiadek…'
-    : currentSuggestions.error ? currentSuggestions.error
-      : offers?.outcome === 'walking_unavailable' ? 'Brak aktualnego szacunku dojścia. Zaktualizuj lokalny cache.'
-        : offers?.outcome === 'no_match' ? 'Brak pasującego kursu z aktualnym dojściem. Spróbuj innej linii, kierunku lub przystanku.'
-          : offers?.outcome === 'no_reachable' ? 'Brak osiągalnego kursu w ciągu 6 godzin. Zmień cel lub pociąg.'
-            : offers?.outcome === 'choose_destination' && !offers.directions.length ? 'Brak osiągalnych kierunków w ciągu 6 godzin.' : ''
-
-  return <section className={styles.transit} aria-label="Przesiadka z rozkładu">
-    <h1 className={styles.srOnly}>Znajdź przesiadkę SKM → ZTM</h1>
-    {(!setup || setup.error) && <div className={styles.setupNotice} role={setup?.error ? 'alert' : 'status'}>
-      {setup?.error ? <><p>{setup.error}</p><button onClick={() => setSetupAttempt(value => value + 1)}>Sprawdź rozkłady ponownie</button></> : 'Sprawdzanie lokalnych rozkładów…'}
+  return <section className={`${styles.transit} ${layout.planner} ${data?.results.length && !editing ? layout.compact : ''}`} aria-label="Zaplanuj podróż SKM i ZTM">
+    <h1 className={styles.srOnly}>Zaplanuj podróż SKM → ZTM</h1>
+    {availability?.demo && <div className={layout.demo}><p>{availability.demo.label}</p>
+      <button type="button" aria-expanded={examplesOpen} onClick={() => setExamplesOpen(x => !x)}>Zobacz przykład</button>
+      {examplesOpen && <div role="group" aria-label="Przykłady archiwalnego demo" className={layout.demoExamples}>{availability.demo.examples.map(example =>
+        <button key={example.id} type="button" onClick={() => chooseExample(example)}><strong>{example.name}</strong><span>{example.description}</span></button>)}</div>}
+    </div>}
+    {availabilityError && <p role="alert" className={layout.notice}>{availabilityError} <button type="button" onClick={() => setAvailabilityAttempt(x => x + 1)}>Sprawdź dane ponownie</button></p>}
+    <form className={layout.form} onSubmit={submit}>
+      <StopPicker key={`origin-${exampleVersion}`} label="Skąd jedziesz?" operator="skm" initialValue={origin} onChange={value => { setOrigin(value); invalidate() }} />
+      <fieldset className={layout.when}><legend>Kiedy wyruszasz?</legend><div className={layout.dateTime}>
+        <label><span className={styles.srOnly}>Data wyjazdu</span><input type="date" required value={day} min={availability?.first} max={availability?.last}
+          onChange={e => { setDay(e.target.value); setOffset(''); invalidate() }} /></label>
+        <label><span className={styles.srOnly}>Godzina wyjazdu</span><input type="time" required value={time} min={availability?.demo?.min_departure_time} max={availability?.demo?.max_departure_time}
+          onChange={e => { setTime(e.target.value); setOffset(''); invalidate() }} /></label></div>
+        <p className={layout.fieldHint}>Czas lokalny: Europe/Warsaw.{availability && <> Dane: {availability.first.split('-').reverse().join('.')}{availability.first !== availability.last && <>–{availability.last.split('-').reverse().join('.')}</>}.
+          {availability.demo && <> Wyjazd {availability.demo.min_departure_time}–{availability.demo.max_departure_time}.</>}</>}</p>
+        {!options.length && <p role="alert" className={layout.fieldHint}>Wybierz poprawną godzinę. Ta pora może nie istnieć przy zmianie czasu.</p>}
+        {options.length > 1 && <label>Godzina występuje dwukrotnie<select required value={offset} onChange={e => { setOffset(e.target.value); invalidate() }}>
+          <option value="">Wybierz wystąpienie</option>{options.map((value, index) => <option key={value} value={value.slice(-6)}>{index + 1}. wystąpienie · UTC{value.slice(-6)}</option>)}
+        </select></label>}
+      </fieldset>
+      <StopPicker key={`destination-${exampleVersion}`} label="Dokąd jedziesz?" operator="ztm" initialValue={destination} onChange={value => { setDestination(value); invalidate() }} />
+      <div className={layout.searchAction}><p>SKM → szacowane dojście → ZTM. Porównujemy wyłącznie zatwierdzone przesiadki.</p>
+        <button className={styles.primary} disabled={!input || searching}>{searching ? 'Wyszukiwanie…' : 'Szukaj podróży'}</button></div>
+    </form>
+    <div className={layout.notice} role={current?.error ? 'alert' : 'status'}>
+      {searching ? 'Porównujemy pociągi, miejsca przesiadki i dotarcie do celu…' : current?.error
+        ?? (data && !plan ? notices[data.outcome] : !submitted ? 'Wybierz stację, godzinę i cel. Kursy oraz miejsce przesiadki dobierzemy z lokalnego rozkładu.' : '')}
+    </div>
+    {data && <div ref={resultSummary} tabIndex={-1} className={layout.summary}><div><p className={layout.selectedGoal}>{origin?.name} → {destination?.name}</p><p>{fullDate(data.requested_departure_at)} · rozkład planowany</p>
+      <p>Najlepszy wynik tylko wśród aktualnie obsługiwanych połączeń.</p></div>
+      <button type="button" className={layout.editSearch} onClick={() => { setEditing(true); window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('input[list]')?.focus()) }}>Zmień podróż</button>
+      {data.results.length > 1 && <><button id={`${id}-alternatives`} type="button" aria-expanded={alternatives} onClick={() => setAlternatives(x => !x)}>Inne podróże ({data.results.length - 1})</button>
+        {alternatives && <div className={layout.alternatives} role="group" aria-label="Warianty podróży">{data.results.map((item, index) =>
+          <button key={planIdentity(item)} aria-pressed={index === selectedIndex} onClick={() => { setSelectedIndex(index); setAlternatives(false); setEvaluation(null)
+            document.getElementById(`${id}-alternatives`)?.focus() }}>
+            <strong>{index === 0 ? 'Rekomendowana' : `Alternatywa ${index}`} · dotarcie {clock(item.destination.arrival_at!)}</strong>
+            <span>SKM {clock(item.origin.departure_at!)} → {item.arrival.stop_name} → {item.departure.line} {item.departure.direction}</span>
+            <span>Dojście szac. {item.link.walking_minutes} min · {item.risk === 'tight' ? 'mały zapas' : 'zapas co najmniej 2 min'} przy 0 min opóźnienia</span>
+          </button>)}</div>}</>}
     </div>}
     <div className={styles.board}>
-      <CourseCard arrival journey={arrival} stop={setup?.link?.arrival_stop} delay={delay} disabled={!setup?.link} onChoose={() => setPicker(true)} />
-      <CourseCard arrival={false} journey={departure} stop={link?.departure_stop} delay={delay}
-        reference={arrival?.arrival_at ?? undefined}
-        disabled={!offers?.results.length} expanded={alternativesOpen} onChoose={() => setAlternativesOpen(value => !value)}
-        control={<label className={styles.destination}>Dokąd chcesz jechać?
-          <input type="search" value={query} maxLength={120} disabled={!arrival} placeholder="Linia, kierunek lub przystanek"
-            aria-describedby={`${id}-suggestion-notice`} onChange={event => changeQuery(event.target.value)} />
-        </label>}>
-        <div id={`${id}-suggestion-notice`} className={styles.suggestionNotice} role={currentSuggestions?.error ? 'alert' : 'status'}>
-          {suggestionNotice}
-          {!selected && !!offers?.excluded_links.length && <p>Część przystanków pominięto z powodu braku aktualnego szacunku dojścia.</p>}
-          {currentSuggestions?.error && <button onClick={() => { resetSelection(); setSuggestionAttempt(value => value + 1) }}>Ponów wyszukiwanie</button>}
-        </div>
-        {offers?.outcome === 'choose_destination' && offers.directions.length > 0 && <div className={styles.destinationHints} role="group" aria-label="Dostępne kierunki">
-          {offers.directions.slice(0, 3).map(item => <button key={item.query} onClick={() => changeQuery(item.query)}>{item.line} · {item.direction}</button>)}
-        </div>}
-        {selected && <details className={styles.explanation}><summary>Dlaczego ten kurs?</summary>
-          <p>{isRecommended ? offers?.reason : 'Kurs wybrany ręcznie z propozycji.'} Dobór przy 0 min opóźnienia.</p>
-          <p>Suwak ocenia wybrany kurs. Zmiana opóźnienia nie przełącza odjazdu.</p>
-          <p>{offers?.limitations.join(' ')}</p>
-          {offers?.excluded_links.length ? <p>Część powiązań pominięto z powodu braku aktualnego dojścia.</p> : null}
-          {selected.match.kind === 'stop' && <p>Kurs zatrzymuje się dalej na przystanku {selected.match.stop_name}.</p>}
-        </details>}
-        {alternativesOpen && offers && <div className={styles.alternatives} role="group" aria-label="Inne kursy ZTM">
-          {offers.results.map(item => <button key={`${item.link.id}:${journeyKey(item.departure)}`}
-            aria-pressed={selected?.link.id === item.link.id && journeyKey(selected.departure) === journeyKey(item.departure)}
-            onClick={() => {
-              if (selected?.link.id === item.link.id && journeyKey(selected.departure) === journeyKey(item.departure)) {
-                setAlternativesOpen(false)
-                return
-              }
-              resetSelection()
-              setChosen({ key: base, item })
-            }}>
-            <strong>{clock(item.departure.departure_at!)} · {item.departure.line}</strong><span>{item.departure.direction}</span>
-            <span>{item.link.departure_stop.stop_name} · dojście szac. {item.link.walking_minutes} min</span>
-            <span>{fullDate(item.departure.departure_at!)}</span>
-          </button>)}
-          {offers.has_more && <p>Zawęż wyszukiwanie, aby zobaczyć inne pasujące kursy.</p>}
-        </div>}
-      </CourseCard>
-      <div className={`${styles.result} ${styles[state]}`} aria-busy={pending}>
+      <JourneyCard plan={plan} arrival reference={data?.requested_departure_at ?? ''} />
+      <JourneyCard plan={plan} arrival={false} reference={data?.requested_departure_at ?? ''} />
+      <div className={`${styles.result} ${styles[state]} ${layout.analysis}`} aria-busy={pending}>
         <TransitFigure margin={figureMargin} />
         <div role="status" aria-live="polite" aria-atomic="true" className={styles.resultText}>
           <p className={styles.status}>{error ? 'Nie można ocenić' : pending ? 'Przeliczanie…' : labels[state]}</p>
@@ -193,36 +205,29 @@ export default function Transit() {
             aria-label={result ? `Zapas czasu: ${result.margin_minutes} minut` : pending ? 'Przeliczanie wyniku' : 'Brak wyniku'}>
             {margin ? <>{result!.margin_minutes > 0 ? '+' : ''}{margin.amount}<span> {margin.unit}</span></> : <span className={styles.waiting}>—</span>}
           </output>
-          <p className={styles.resultHint}>{result ? `Zapas po ${link?.walking_minutes} min szacowanego dojścia` : error ? 'Odśwież propozycje lub wybierz inny kurs.'
-            : pending ? 'Sprawdzamy wybrany kurs…' : !arrival ? 'Wybierz swój pociąg.' : 'Wpisz cel lub wybierz kierunek.'}</p>
+          <p className={styles.resultHint}>{result ? `Zapas po ${plan?.link.walking_minutes} min szacowanego dojścia` : error ? 'Wyszukaj podróż ponownie, aby odświeżyć dane.'
+            : pending ? 'Sprawdzamy wybrane kursy…' : 'Tu pojawi się zapas przesiadki.'}</p>
         </div>
       </div>
-      <div className={styles.delayControl}>
-        <div className={styles.sliderHeading}><label htmlFor={`${id}-delay`}>Opóźnienie pociągu SKM</label><output htmlFor={`${id}-delay`}>+{delay} min</output></div>
+      <div className={`${styles.delayControl} ${layout.simulation}`}>
+        <div className={styles.sliderHeading}><label htmlFor={`${id}-delay`}>Opóźnienie pociągu SKM</label><output>+{delay} min</output></div>
         <div className={styles.slider}><input id={`${id}-delay`} type="range" min="0" max="30" step="1" value={delay}
-          aria-valuetext={`${delay} minut symulowanego opóźnienia`} aria-describedby={`${id}-delay-source`}
-          disabled={!selected} onChange={event => setDelay(Number(event.target.value))} /></div>
+          aria-valuetext={`${delay} minut symulowanego opóźnienia`} aria-describedby={`${id}-simulation`}
+          disabled={!plan} onChange={e => setDelay(Number(e.target.value))} /></div>
         <div className={styles.sliderLimits} aria-hidden="true"><span>0 min</span><span>30 min</span></div>
-        <p id={`${id}-delay-source`} className={styles.delaySource}>Opóźnienie jest symulacją. Rozkład planowany.</p>
+        <p id={`${id}-simulation`} className={styles.delaySource}>Symulacja opóźnienia. Suwak nie zmienia wybranych kursów ani planowanej godziny dotarcia.</p>
       </div>
     </div>
-    {error && <div className={styles.error} role="alert"><p>{error}</p><button onClick={() => {
-      resetSelection()
-      setSuggestionAttempt(value => value + 1)
-    }}>Odśwież propozycje</button></div>}
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {plan && <div className={layout.details}><p>Przesiadka: {plan.arrival.stop_name} → {plan.departure.stop_name}. Szacowane dojście: {plan.link.walking_minutes} min.</p>
+      <details><summary>Dlaczego ta podróż?</summary><p>{data?.reason}</p><p>Ranking przy 0 min opóźnienia. Podróż od odjazdu SKM: {Math.ceil(plan.total_minutes)} min, oczekiwanie po dojściu: {Math.round(plan.waiting_minutes * 10) / 10} min.</p>
+        <p>Zatwierdzone powiązania: {data?.scope.approved_links}; z aktualnym dojściem: {data?.scope.available_links}.</p>
+        {availability?.demo && <p>Pomiary ORS odtwarzane według stanu: {fullDate(availability.demo.walking_reference_at)}. To nie jest ich bieżąca aktualność.</p>}
+        {data?.limitations.map(text => <p key={text}>{text}</p>)}</details></div>}
     <div className={styles.walkingNote}>
-      <p>Rozkład {setup?.sources?.map(source => <a key={source.operator} href={source.documentation_url}
-        title={`${source.attribution}. Dni kursowania ${source.service_start_date}–${source.service_end_date}.`} target="_blank" rel="noreferrer">{source.operator.toUpperCase()} </a>)}</p>
-      {walking && <p>Szacowane dojście {link?.walking_minutes} min. {walking.attribution}. <a href={walking.license_url}>CC BY-SA 4.0</a>. Peron SKM nie jest określony.</p>}
+      <p>Wyłącznie lokalny rozkład planowany. Wynik nie jest globalnie najszybszą trasą.</p>
+      {data?.sources.map(source => <p key={source.operator}><a href={source.documentation_url} target="_blank" rel="noreferrer">{source.attribution}</a> · {availability?.demo ? 'zakres oryginalnego feedu' : 'dni kursowania'} {source.service_start_date}–{source.service_end_date}</p>)}
+      {plan?.link.walking.estimate && <p>Szacowane dojście na podstawie OpenRouteService. {plan.link.walking.estimate.attribution}. <a href={plan.link.walking.estimate.license_url}>CC BY-SA 4.0</a>. Peron SKM nie jest określony.</p>}
     </div>
-    {picker && setup?.link && setup.sources && <JourneyPicker leg="arrival" linkId={setup.link.id} stop={setup.link.arrival_stop}
-      source={setup.sources.find(source => source.operator === 'skm')!} selected={arrival}
-      onClose={() => setPicker(false)} onChoose={journey => {
-        if (!arrival || journeyKey(arrival) !== journeyKey(journey) || arrival.arrival_at !== journey.arrival_at) {
-          resetSelection()
-          setArrival(journey)
-        }
-        setPicker(false)
-      }} />}
   </section>
 }
