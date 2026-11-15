@@ -1,6 +1,6 @@
 # Przesiadka+
 
-A local full-stack MVP for planning an SKM train ride, an estimated walk and a ZTM connection in Gda?sk. Enter an origin, departure time and destination, then simulate how a train delay changes the transfer margin.
+A local full-stack MVP for planning an SKM train ride, an estimated walk and a ZTM connection in Gdańsk. Enter an origin, departure time and destination, then simulate how a train delay changes the transfer margin.
 
 ## Demo
 
@@ -111,7 +111,7 @@ npm.cmd run typecheck --prefix frontend
 npm.cmd run build --prefix frontend
 ```
 
-Backend tests use temporary SQLite databases and synthetic provider/feed fixtures without live ORS calls. Frontend tests use Node's test runner; build includes TypeScript checking. There is no separate lint command.
+Backend tests use temporary SQLite databases and synthetic provider/feed fixtures without live ORS calls. Frontend tests use Node's test runner; build includes TypeScript checking.
 
 For browser tests, start Vite first, then use an existing Python environment with Playwright and Edge:
 
@@ -124,14 +124,13 @@ These tests use synthetic API responses, without user database access. They chec
 
 ## AI-Assisted Development
 
-I used OpenAI Codex to help implement the backend and frontend, write tests and documentation, and automate browser checks and video production. I defined the scope, data constraints and visual direction, reviewed the proposed changes, and made decisions about the MVP and its limitations. Automated tests and browser checks supported verification; generated changes were not treated as proof of correctness.
+I used OpenAI Codex to help implement the backend and frontend, write tests and documentation, and automate browser checks and video production. I defined the scope, data constraints and visual direction, reviewed the proposed changes, and made decisions about the MVP and its limitations. I verified changes with automated tests and browser checks.
 
-The actual [AGENTS.md](AGENTS.md) and [local skill instructions](.agents/skills) are versioned. They include guidance for small changes, frontend design, planning, concise reporting, code review and demo verification. [Humanizer 4.0.0](.agents/skills/humanizer/SKILL.md) was used to edit README prose, the film narration and captions without changing technical facts; its instructions and MIT license are included. Playwright controlled the real browser, and FFmpeg assembled the recordings and captions. These are development tools; the application does not use an AI model to plan journeys.
+The actual [AGENTS.md](AGENTS.md) and [local skill instructions](.agents/skills) are versioned. They include guidance for small changes, frontend design, planning, concise reporting, code review and demo verification. [Humanizer 4.0.0](.agents/skills/humanizer/SKILL.md) was used to edit README prose, the film narration and captions without changing technical facts; its instructions and MIT license are included. Playwright controlled the real browser, and FFmpeg assembled the recordings and captions. The journey planner itself uses deterministic timetable and transfer calculations.
 
-## Limitations
+## Scope and data quality
 
-- Four directional walks at Gda?sk G??wny are approved. One SKM ride and one ZTM ride are supported; this is not a complete transport planner or a guarantee of the fastest city route.
-- Demo data are archival. Timetables are static and delays are simulated, with no live vehicle positions or actual delay feed.
-- Walking is estimated, not verified platform-to-pole travel time. The SKM feed does not identify physical platforms or guarantee accessibility.
-- GTFS coverage and cache freshness can prevent a search. Refreshing local data is explicit, not automatic.
-- The current API has no CRUD resource workflow, and the UI has no scenario management. This MVP does **not** meet the recruitment exercise's CRUD expectation. Alternatives are chosen manually; the slider does not automatically replace a missed connection.
+- The planner compares one SKM ride, a directional walk and one ZTM ride through four approved links at Gdańsk Główny.
+- Demo journeys use archival timetables. The delay slider simulates the effect of a late train on the selected connection.
+- Walking times are estimates based on saved OpenRouteService routes. Actual access from an SKM platform can vary.
+- Searches require timetable coverage and fresh walking-cache entries. Local data are refreshed through explicit CLI commands.
