@@ -20,7 +20,7 @@ Wszystkie wyjazdy: 13.11.2026, wyszukiwanie od 17:00. Wyniki oblicza istniejące
 
 ## Ograniczenia prezentacji
 
-To odtworzenie lokalnych archiwalnych danych, nie dane realtime ani globalnie najszybszy routing. Dojście jest zapisanym szacunkiem OpenRouteService, zaokrąglonym w górę do pełnych minut. Nie wykonujemy nowych zapytań ORS. Szczegóły źródeł i ograniczeń opisuje [dokumentacja demo](../docs/demo.md).
+To odtworzenie lokalnych archiwalnych danych, nie dane realtime ani globalnie najszybszy routing. Dojście jest zapisanym szacunkiem OpenRouteService, zaokrąglonym w górę do pełnych minut. Nie wykonujemy nowych zapytań ORS. Szczegóły źródeł i ograniczeń opisuje [dokumentacja demo](../../../docs/demo.md).
 
 ## Dowody
 

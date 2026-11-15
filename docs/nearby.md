@@ -40,9 +40,9 @@ The existing [walking cache policy](walking.md#sqlite-and-freshness) remains unc
 
 Saved results retain `© openrouteservice by HeiGIT | Data from OpenStreetMap`, license/terms links and the terms review date. See [provider contract and reuse](walking.md#provider-contract-and-reuse) for CC BY-SA 4.0 obligations. Discovery distances are independent geometric calculations; they are not ORS results.
 
-## Local observation: 13 November 2026
+## Historical discovery observation (before further cache imports)
 
-With the existing local imports, `skm:7500` yields **23 candidates within 500 m, 1 cache hit**. Some actual results:
+An earlier local snapshot yielded **23 candidates within 500 m, 1 cache hit** for `skm:7500`. The current cache may contain more saved pairs or expired entries; use the dry-run for current counts. Some actual results:
 
 | Destination | GTFS name | Straight-line metres | Cache |
 | --- | --- | ---: | --- |

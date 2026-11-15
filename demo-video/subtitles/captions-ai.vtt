@@ -1,0 +1,122 @@
+WEBVTT
+
+00:00:00.120 --> 00:00:03.064
+Wybieram Wrzeszcz, godzinę i Przegalinę.
+
+00:00:03.453 --> 00:00:07.083
+Aplikacja dobiera kursy, miejsce przesiadki i dojście.
+
+00:00:09.284 --> 00:00:14.284
+To archiwalny rozkład z trzynastego listopada dwa tysiące
+dwudziestego szóstego roku.
+
+00:00:16.396 --> 00:00:21.572
+SKM odjeżdża o siedemnastej zero dwa i dociera do Gdańska
+Głównego siedem minut później.
+
+00:00:24.120 --> 00:00:27.609
+Dalej jest autobus sto dwanaście o siedemnastej
+szesnaście.
+
+00:00:28.120 --> 00:00:31.826
+Do Przegaliny docieram planowo o osiemnastej dwadzieścia
+jeden.
+
+00:00:32.120 --> 00:00:35.885
+Po dwóch minutach szacowanego dojścia zostaje pięć minut
+zapasu.
+
+00:00:37.658 --> 00:00:39.539
+Nie wybieram ręcznie słupka.
+
+00:00:40.120 --> 00:00:42.666
+Bez opóźnienia postać spokojnie idzie.
+
+00:00:42.812 --> 00:00:45.944
+Suwak ocenia te same kursy, bez zmiany planu.
+
+00:00:47.530 --> 00:00:50.948
+Cztery minuty opóźnienia zostawiają jedną minutę zapasu.
+
+00:00:53.203 --> 00:00:54.909
+Postać zaczyna biec.
+
+00:00:57.659 --> 00:01:00.170
+Przy pięciu minutach zapas wynosi zero.
+
+00:01:03.120 --> 00:01:06.000
+Sześć minut oznacza spóźnienie na ten autobus.
+
+00:01:07.575 --> 00:01:09.851
+Opóźnienie jest wyłącznie symulowane.
+
+00:01:10.120 --> 00:01:12.521
+Napisałem własny planer w Pythonie.
+
+00:01:14.120 --> 00:01:16.894
+Sprawdza dalsze postoje konkretnego pociągu.
+
+00:01:18.120 --> 00:01:21.561
+Porównuje zatwierdzone przejścia i dokładne słupki ZTM.
+
+00:01:21.889 --> 00:01:24.839
+Potem sprawdza dalszą trasę wybranego autobusu.
+
+00:01:25.599 --> 00:01:29.370
+Cel musi występować na tym samym kursie, po przystanku
+wejścia.
+
+00:01:32.120 --> 00:01:34.990
+Planer uwzględnia dojście i oblicza zapas.
+
+00:01:35.120 --> 00:01:38.238
+Preferuje warianty z zapasem co najmniej dwóch minut.
+
+00:01:39.848 --> 00:01:42.495
+W tej grupie liczy się czas dotarcia do celu.
+
+00:01:45.120 --> 00:01:48.266
+React i TypeScript odpowiadają za interfejs.
+
+00:01:48.351 --> 00:01:51.523
+FastAPI udostępnia REST API i waliduje dane.
+
+00:01:52.120 --> 00:01:55.102
+Samą ocenę zapasu wydzieliłem do czystej funkcji.
+
+00:01:55.620 --> 00:01:58.096
+Mogę testować ją bez serwera i bazy.
+
+00:01:59.120 --> 00:02:04.823
+Rozkłady SKM i ZTM importuję z oficjalnych plików GTFS do
+lokalnego SQLite.
+
+00:02:06.120 --> 00:02:08.688
+Dojście pochodzi z cache OpenRouteService.
+
+00:02:09.620 --> 00:02:11.624
+Suwak nie odpytuje tej usługi.
+
+00:02:13.120 --> 00:02:15.600
+Szacunek zaokrąglam w górę do minut.
+
+00:02:17.320 --> 00:02:19.795
+Nieaktualny wpis wyklucza przejście.
+
+00:02:20.120 --> 00:02:25.798
+Testuję backend, frontend i przeglądarkę, także
+kalendarze, północ i zmianę czasu.
+
+00:02:28.120 --> 00:02:31.944
+MVP porównuje cztery zatwierdzone przejścia przy Gdańsku
+Głównym.
+
+00:02:33.658 --> 00:02:35.893
+Nie jest pełnym planerem Trójmiasta.
+
+00:02:37.120 --> 00:02:40.220
+To dane archiwalne, bez rzeczywistych opóźnień.
+
+00:02:40.320 --> 00:02:44.361
+Dojście pozostaje szacunkiem, a nie zweryfikowanym czasem
+od peronu.

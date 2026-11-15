@@ -1,0 +1,49 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 2
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Bahnschrift,34,&H00EDF2F3,&H00EDF2F3,&H000A0808,&H000A0808,0,0,0,0,100,100,0,0,1,0,0,2,100,100,24,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.12,0:00:03.06,Default,,0,0,0,,Wybieram Wrzeszcz, godzinę i Przegalinę.
+Dialogue: 0,0:00:03.45,0:00:07.08,Default,,0,0,0,,Aplikacja dobiera kursy, miejsce przesiadki i dojście.
+Dialogue: 0,0:00:09.28,0:00:14.28,Default,,0,0,0,,To archiwalny rozkład z trzynastego listopada dwa tysiące\Ndwudziestego szóstego roku.
+Dialogue: 0,0:00:16.39,0:00:21.57,Default,,0,0,0,,SKM odjeżdża o siedemnastej zero dwa i dociera do Gdańska\NGłównego siedem minut później.
+Dialogue: 0,0:00:24.12,0:00:27.60,Default,,0,0,0,,Dalej jest autobus sto dwanaście o siedemnastej\Nszesnaście.
+Dialogue: 0,0:00:28.12,0:00:31.82,Default,,0,0,0,,Do Przegaliny docieram planowo o osiemnastej dwadzieścia\Njeden.
+Dialogue: 0,0:00:32.12,0:00:35.88,Default,,0,0,0,,Po dwóch minutach szacowanego dojścia zostaje pięć minut\Nzapasu.
+Dialogue: 0,0:00:37.65,0:00:39.53,Default,,0,0,0,,Nie wybieram ręcznie słupka.
+Dialogue: 0,0:00:40.12,0:00:42.66,Default,,0,0,0,,Bez opóźnienia postać spokojnie idzie.
+Dialogue: 0,0:00:42.81,0:00:45.94,Default,,0,0,0,,Suwak ocenia te same kursy, bez zmiany planu.
+Dialogue: 0,0:00:47.53,0:00:50.94,Default,,0,0,0,,Cztery minuty opóźnienia zostawiają jedną minutę zapasu.
+Dialogue: 0,0:00:53.20,0:00:54.90,Default,,0,0,0,,Postać zaczyna biec.
+Dialogue: 0,0:00:57.65,0:01:00.17,Default,,0,0,0,,Przy pięciu minutach zapas wynosi zero.
+Dialogue: 0,0:01:03.12,0:01:06.00,Default,,0,0,0,,Sześć minut oznacza spóźnienie na ten autobus.
+Dialogue: 0,0:01:07.57,0:01:09.85,Default,,0,0,0,,Opóźnienie jest wyłącznie symulowane.
+Dialogue: 0,0:01:10.12,0:01:12.52,Default,,0,0,0,,Napisałem własny planer w Pythonie.
+Dialogue: 0,0:01:14.12,0:01:16.89,Default,,0,0,0,,Sprawdza dalsze postoje konkretnego pociągu.
+Dialogue: 0,0:01:18.12,0:01:21.56,Default,,0,0,0,,Porównuje zatwierdzone przejścia i dokładne słupki ZTM.
+Dialogue: 0,0:01:21.88,0:01:24.83,Default,,0,0,0,,Potem sprawdza dalszą trasę wybranego autobusu.
+Dialogue: 0,0:01:25.59,0:01:29.37,Default,,0,0,0,,Cel musi występować na tym samym kursie, po przystanku\Nwejścia.
+Dialogue: 0,0:01:32.12,0:01:34.99,Default,,0,0,0,,Planer uwzględnia dojście i oblicza zapas.
+Dialogue: 0,0:01:35.12,0:01:38.23,Default,,0,0,0,,Preferuje warianty z zapasem co najmniej dwóch minut.
+Dialogue: 0,0:01:39.84,0:01:42.49,Default,,0,0,0,,W tej grupie liczy się czas dotarcia do celu.
+Dialogue: 0,0:01:45.12,0:01:48.26,Default,,0,0,0,,React i TypeScript odpowiadają za interfejs.
+Dialogue: 0,0:01:48.35,0:01:51.52,Default,,0,0,0,,FastAPI udostępnia REST API i waliduje dane.
+Dialogue: 0,0:01:52.12,0:01:55.10,Default,,0,0,0,,Samą ocenę zapasu wydzieliłem do czystej funkcji.
+Dialogue: 0,0:01:55.62,0:01:58.09,Default,,0,0,0,,Mogę testować ją bez serwera i bazy.
+Dialogue: 0,0:01:59.12,0:02:04.82,Default,,0,0,0,,Rozkłady SKM i ZTM importuję z oficjalnych plików GTFS do\Nlokalnego SQLite.
+Dialogue: 0,0:02:06.12,0:02:08.68,Default,,0,0,0,,Dojście pochodzi z cache OpenRouteService.
+Dialogue: 0,0:02:09.62,0:02:11.62,Default,,0,0,0,,Suwak nie odpytuje tej usługi.
+Dialogue: 0,0:02:13.12,0:02:15.60,Default,,0,0,0,,Szacunek zaokrąglam w górę do minut.
+Dialogue: 0,0:02:17.32,0:02:19.79,Default,,0,0,0,,Nieaktualny wpis wyklucza przejście.
+Dialogue: 0,0:02:20.12,0:02:25.79,Default,,0,0,0,,Testuję backend, frontend i przeglądarkę, także\Nkalendarze, północ i zmianę czasu.
+Dialogue: 0,0:02:28.12,0:02:31.94,Default,,0,0,0,,MVP porównuje cztery zatwierdzone przejścia przy Gdańsku\NGłównym.
+Dialogue: 0,0:02:33.65,0:02:35.89,Default,,0,0,0,,Nie jest pełnym planerem Trójmiasta.
+Dialogue: 0,0:02:37.12,0:02:40.22,Default,,0,0,0,,To dane archiwalne, bez rzeczywistych opóźnień.
+Dialogue: 0,0:02:40.32,0:02:44.36,Default,,0,0,0,,Dojście pozostaje szacunkiem, a nie zweryfikowanym czasem\Nod peronu.

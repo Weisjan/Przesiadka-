@@ -245,3 +245,9 @@ secrets/
 /demo-video/qa/
 /demo-video/.production-work/
 /demo-video/source/graphics/*.png
+
+# Local TTS inputs and rendered voiceover audio
+/demo-video/voiceover/generated/
+
+# Recruitment deliverable: publish only the captioned demo
+!/demo-video/final/przesiadka-demo-subtitled.mp4

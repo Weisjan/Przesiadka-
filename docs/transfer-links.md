@@ -21,11 +21,11 @@ The current screen uses the [origin-to-destination planner](journey-planner.md).
 
 The result includes the exact arrival/departure and evaluation margin/status. Walking comes exclusively from a fresh directional cache entry whose coordinates match the GTFS snapshot. Missing/stale/no_route returns 422, cache errors 503. The API never calls ORS. The pure evaluator performs UTC arithmetic; the frontend displays its result.
 
-The single screen presents the SKM train picker, a destination field, course cards, status figure and slider. The backend selects a boarding stop from approved links. Pair/course changes invalidate old results. Both request aborts and input identity checks guard against late responses. Provider attribution accompanies the cached walking estimate.
+The current planner screen selects an origin, date/time and destination. It reuses `/transfers/search` for fixed-course simulation; it does not expose the former manual train picker. Both request aborts and input identity checks guard against late responses. Provider attribution accompanies the cached walking estimate.
 
 ## Suggestions for a selected train
 
-`POST /api/transit/transfers/suggest` reads the local GTFS and walking stores. Its JSON body contains `arrival_stop_id`, `arrival_trip_id`, `arrival_service_date`, `arrival_stop_sequence`, `query`, optional `delay_minutes` (0–30, default 0) and optional `limit` (1–20, default 12). The arrival identifies one exact stop occurrence and service day. The frontend sends zero delay for initial selection and uses the existing `/transfers/search` endpoint when the slider changes.
+`POST /api/transit/transfers/suggest` reads the local GTFS and walking stores. Its JSON body contains `arrival_stop_id`, `arrival_trip_id`, `arrival_service_date`, `arrival_stop_sequence`, `query`, optional `delay_minutes` (0–30, default 0) and optional `limit` (1–20, default 12). The arrival identifies one exact stop occurrence and service day. This retained API is independent of the current planner UI, which plans through `/journeys/plan` and simulates through `/transfers/search`.
 
 The search covers six elapsed hours from the scheduled arrival, across approved links from that SKM station. A link needs current directional walking cache. A destination name must match an accessible downstream stop of the exact ZTM trip, with a known arrival time. Line and direction searches retain each trip's exact route, stop, direction and service date. Calendars and extended GTFS hours use the existing schedule helpers.
 
@@ -33,5 +33,5 @@ Ranking uses three bands in order of preference. Courses with at least two minut
 
 Responses include `recommendation`, ranked `results`, `reason`, available `directions`, `excluded_links`, `search_window`, `limitations` and `is_realtime=false`. Outcomes are `choose_destination`, `recommended`, `no_match`, `no_reachable` or `walking_unavailable`. An empty query returns direction suggestions without choosing a destination. Responses contain at most 20 courses and 12 directions, with `has_more` indicating additional matched courses. Feed coverage failures return HTTP 422, missing arrival/link HTTP 404 and candidate overflow HTTP 409. Each approved stop has a hard limit of 2000 departures per search window.
 
-The screen keeps the selected departure fixed during delay simulation. A new train or goal clears old results. Manual alternatives come from the current query's matching courses. Fetch cancellation, input keys and response validation protect against older suggestions, walking estimates and evaluations.
+The current screen keeps the selected departure fixed during delay simulation. Editing the search clears old results. Manual alternatives come from the current planner response. Fetch cancellation, input keys and response validation protect against older plans and evaluations.
 

@@ -110,3 +110,9 @@ Regulaminy GTFS wymagają podania źródła oraz dat wytworzenia i pozyskania. I
 Tylko jedna przesiadka i cztery zatwierdzone pary przy Gdańsku Głównym. Trasa przez ten węzeł może być objazdem względem nieobsługiwanej alternatywy. Zapas nie gwarantuje zdążenia: feed SKM nie podaje peronu, a czas ORS nie jest pomiarem terenowym ani potwierdzeniem dostępności. Dane są statyczne. Tryb archiwalny nie służy do planowania dzisiejszej podróży.
 
 Dalsze rozszerzenia: terenowa walidacja dojścia, jawne zatwierdzenie kolejnego węzła, lepsze podpowiedzi nazw oraz badanie z pasażerem. Wymagają osobnych etapów; demo nie rozszerza rejestru i nie wykonuje masowych importów.
+
+## Recruitment film
+
+The current 2:45 production, narrated export, subtitles and reproduction commands are documented in [demo-video/README.md](../demo-video/README.md). The earlier 3:55 draft is superseded by the current [storyboard](../demo-video/storyboard.md) and [final narration](../demo-video/voiceover/voiceover-script.md).
+
+Przegalina is the main film example because it clearly demonstrates all margin states. Routing through Gdańsk Główny can be a detour for other destinations: inspected archival GTFS included a direct tram 6 from Galeria Bałtycka 01 at 17:11 to Strzyża PKM 01 at 17:16, outside this planner's approved links. This comparison does not validate walking access or establish a globally optimal route. The film must retain its limited-coverage notice and GTFS/ORS attribution. Local data archives must not be redistributed without resolving the production-date and provider-terms requirements above.
