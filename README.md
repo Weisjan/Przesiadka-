@@ -4,9 +4,9 @@ A local full-stack MVP for planning an SKM train ride, an estimated walk and a Z
 
 ## Demo
 
-[Watch or download the captioned demo (MP4, 2:45)](demo-video/final/przesiadka-demo-subtitled.mp4)
+[Watch or download the narrated demo (MP4, 2:45)](demo-video/final/przesiadka-demo-ai-voice.mp4)
 
-The film shows the real Kinetic Transit interface and local API, followed by diagrams explaining the implementation. It has Polish captions and no audio. Its timetable is archival, not live. [Production scripts and storyboard](demo-video/README.md) are included; clean masters, source recordings and TTS audio remain local.
+The film shows the real Kinetic Transit interface and local API, followed by diagrams explaining the implementation. It has Polish AI narration and captions. Its timetable is archival, not live. [Production scripts and storyboard](demo-video/README.md) are included; clean masters, source recordings and TTS audio remain local.
 
 ## Features
 

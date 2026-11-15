@@ -249,5 +249,5 @@ secrets/
 # Local TTS inputs and rendered voiceover audio
 /demo-video/voiceover/generated/
 
-# Recruitment deliverable: publish only the captioned demo
-!/demo-video/final/przesiadka-demo-subtitled.mp4
+# Recruitment deliverable: publish only the narrated demo
+!/demo-video/final/przesiadka-demo-ai-voice.mp4

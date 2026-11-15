@@ -1,6 +1,6 @@
 # Recruitment video production
 
-The current film is **2:45, 1920?1080, 30 FPS, H.264**. It records the real Kinetic Transit application in Edge and uses separate diagrams to explain the implemented planner. The silent captioned recruitment MP4 is selected for Git. Other movies and source audio remain local and excluded from Git.
+The current film is **2:45, 1920?1080, 30 FPS, H.264**. It records the real Kinetic Transit application in Edge and uses separate diagrams to explain the implemented planner. The narrated recruitment MP4 is selected for Git. Other movies and source audio remain local and excluded from Git.
 
 ## Exports and sources
 
@@ -13,7 +13,7 @@ The current film is **2:45, 1920?1080, 30 FPS, H.264**. It records the real Kine
 | `source/recordings/` | Actual Edge recordings, including the 18-second motion sample |
 | `source/graphics/` | Versioned SVG diagram sources and ignored generated PNGs |
 
-The root README links to `final/przesiadka-demo-subtitled.mp4`, the only movie allowed by .gitignore for the recruitment submission. It has Polish captions and no audio. The separate narrated export remains local and needs a final listening check. Do not distribute databases or TTS inputs alongside the film by default.
+The root README links to `final/przesiadka-demo-ai-voice.mp4`, the only movie allowed by .gitignore for the recruitment submission. It has Polish AI narration and captions and needs a final listening check. Do not distribute databases or TTS inputs alongside the film by default.
 
 [Storyboard](storyboard.md) ? [Narration](voiceover/voiceover-script.md) ? [Narration timeline](voiceover/narration-timeline.md)
 
@@ -78,4 +78,4 @@ Run the video verifiers against their matching exports, not as substitutes for t
 
 The silent export verifier checks parameters, full decoding, black frames, sampled figure/background motion, caption consistency and caption separation from the clean master. CDP capture uses constant 30 FPS and reports duplicated source frames; it does not promise 30 unique captures every second. The narrated export checks H.264/AAC, complete decoding, source preservation, loudness, caption text and timing bounds. Semantic speech verification and final listening remain manual.
 
-Keep all other MP4s, WAVs, original TTS audio, downloaded tools, databases and working files on disk outside Git. Only `final/przesiadka-demo-subtitled.mp4` is the recruitment deliverable selected for version control. Version scripts, source SVGs, configuration, captions and documentation. No provider license is automatically applied to application code. GTFS/ORS attribution and redistribution conditions are documented in [GTFS](../docs/gtfs.md), [walking](../docs/walking.md) and [demo](../docs/demo.md).
+Keep all other MP4s, WAVs, original TTS audio, downloaded tools, databases and working files on disk outside Git. Only `final/przesiadka-demo-ai-voice.mp4` is the recruitment deliverable selected for version control. Version scripts, source SVGs, configuration, captions and documentation. No provider license is automatically applied to application code. GTFS/ORS attribution and redistribution conditions are documented in [GTFS](../docs/gtfs.md), [walking](../docs/walking.md) and [demo](../docs/demo.md).
