@@ -1,0 +1,9 @@
+Wybieram Wrzeszcz, godzinę i Przegalinę. Aplikacja dobiera kursy, miejsce przesiadki i dojście. To archiwalny rozkład z trzynastego listopada dwa tysiące dwudziestego szóstego roku. SKM odjeżdża o siedemnastej zero dwa i dociera do Gdańska Głównego siedem minut później. Dalej jest autobus sto dwanaście o siedemnastej szesnaście. Do Przegaliny docieram planowo o osiemnastej dwadzieścia jeden. Po dwóch minutach szacowanego dojścia zostaje pięć minut zapasu. Nie wybieram ręcznie słupka.
+
+Bez opóźnienia postać spokojnie idzie. Suwak ocenia te same kursy, bez zmiany planu. Cztery minuty opóźnienia zostawiają jedną minutę zapasu. Postać zaczyna biec. Przy pięciu minutach zapas wynosi zero. Sześć minut oznacza spóźnienie na ten autobus. Opóźnienie jest wyłącznie symulowane.
+
+Napisałem własny planer w Pythonie. Sprawdza dalsze postoje konkretnego pociągu. Porównuje zatwierdzone przejścia i dokładne słupki ZTM. Potem sprawdza dalszą trasę wybranego autobusu. Cel musi występować na tym samym kursie, po przystanku wejścia. Planer uwzględnia dojście i oblicza zapas. Preferuje warianty z zapasem co najmniej dwóch minut. W tej grupie liczy się czas dotarcia do celu.
+
+React i TypeScript odpowiadają za interfejs. FastAPI udostępnia REST API i waliduje dane. Samą ocenę zapasu wydzieliłem do czystej funkcji. Mogę testować ją bez serwera i bazy. Rozkłady SKM i ZTM importuję z oficjalnych plików GTFS do lokalnego SQLite. Dojście pochodzi z cache OpenRouteService. Suwak nie odpytuje tej usługi. Szacunek zaokrąglam w górę do minut. Nieaktualny wpis wyklucza przejście.
+
+Testuję backend, frontend i przeglądarkę, także kalendarze, północ i zmianę czasu. MVP porównuje cztery zatwierdzone przejścia przy Gdańsku Głównym. Nie jest pełnym planerem Trójmiasta. To dane archiwalne, bez rzeczywistych opóźnień. Dojście pozostaje szacunkiem, a nie zweryfikowanym czasem od peronu.

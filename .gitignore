@@ -226,3 +226,28 @@ secrets/
 *.key
 *.p12
 *.pfx
+
+# Downloaded static GTFS feeds and local transit database
+/backend/data/gtfs/
+
+# Local historical recruitment demo (real provider data; never commit the bundle)
+/backend/data/demo/
+
+# Generated recruitment video and local recording/verification artifacts
+/demo-video/*.mp4
+/demo-video/.work/
+/demo-video/verification/
+
+# Final recruitment production: local media, renders and QA
+/demo-video/final/*.mp4
+/demo-video/final/archive/
+/demo-video/source/recordings/
+/demo-video/qa/
+/demo-video/.production-work/
+/demo-video/source/graphics/*.png
+
+# Local TTS inputs and rendered voiceover audio
+/demo-video/voiceover/generated/
+
+# Recruitment deliverable: publish only the narrated demo
+!/demo-video/final/przesiadka-demo-ai-voice.mp4

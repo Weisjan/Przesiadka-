@@ -1,0 +1,274 @@
+{
+  "duration_seconds": 165,
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "example": {
+    "id": "przegalina",
+    "date": "2026-11-13",
+    "start_time": "17:00",
+    "skm_trip_id": "skm:284819",
+    "ztm_trip_id": "ztm:112202611131713_201_112-02",
+    "arrival": "17:09",
+    "departure": "17:16",
+    "destination": "18:21",
+    "walking_seconds": 82.2,
+    "walking_minutes": 2,
+    "margin_minutes": 5,
+    "delays": [
+      0,
+      4,
+      5,
+      6
+    ],
+    "margins": [
+      5,
+      1,
+      0,
+      -1
+    ]
+  },
+  "scenes": [
+    {
+      "scene_id": "scene-1",
+      "start_time": 0,
+      "end_time": 40,
+      "title": "Wybór podróży i rekomendacja"
+    },
+    {
+      "scene_id": "scene-2",
+      "start_time": 40,
+      "end_time": 70,
+      "title": "Symulacja opóźnienia"
+    },
+    {
+      "scene_id": "scene-3",
+      "start_time": 70,
+      "end_time": 105,
+      "title": "Własny algorytm"
+    },
+    {
+      "scene_id": "scene-4",
+      "start_time": 105,
+      "end_time": 140,
+      "title": "Architektura i dane"
+    },
+    {
+      "scene_id": "scene-5",
+      "start_time": 140,
+      "end_time": 165,
+      "title": "Testy i ograniczenia"
+    }
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-01",
+      "scene_id": "scene-1",
+      "start_time": 0,
+      "end_time": 8,
+      "text": "Wybieram Wrzeszcz, godzinę i Przegalinę. Aplikacja dobiera kursy, miejsce przesiadki i dojście.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-02",
+      "scene_id": "scene-1",
+      "start_time": 8,
+      "end_time": 16,
+      "text": "To archiwalny rozkład z trzynastego listopada dwa tysiące dwudziestego szóstego roku.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": "Data: 13 listopada 2026. Pozostałe wskazówki: pronunciation-guide.md."
+    },
+    {
+      "segment_id": "seg-03",
+      "scene_id": "scene-1",
+      "start_time": 16,
+      "end_time": 24,
+      "text": "SKM odjeżdża o siedemnastej zero dwa i dociera do Gdańska Głównego siedem minut później.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-04",
+      "scene_id": "scene-1",
+      "start_time": 24,
+      "end_time": 32,
+      "text": "Dalej jest autobus sto dwanaście o siedemnastej szesnaście. Do Przegaliny docieram planowo o osiemnastej dwadzieścia jeden.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-05",
+      "scene_id": "scene-1",
+      "start_time": 32,
+      "end_time": 40,
+      "text": "Po dwóch minutach szacowanego dojścia zostaje pięć minut zapasu. Nie wybieram ręcznie słupka.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-06",
+      "scene_id": "scene-2",
+      "start_time": 40,
+      "end_time": 47,
+      "text": "Bez opóźnienia postać spokojnie idzie. Suwak ocenia te same kursy, bez zmiany planu.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-07",
+      "scene_id": "scene-2",
+      "start_time": 47,
+      "end_time": 55,
+      "text": "Cztery minuty opóźnienia zostawiają jedną minutę zapasu. Postać zaczyna biec.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-08",
+      "scene_id": "scene-2",
+      "start_time": 55,
+      "end_time": 60,
+      "text": "Przy pięciu minutach zapas wynosi zero.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-09",
+      "scene_id": "scene-2",
+      "start_time": 63,
+      "end_time": 70,
+      "text": "Sześć minut oznacza spóźnienie na ten autobus. Opóźnienie jest wyłącznie symulowane.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-10",
+      "scene_id": "scene-3",
+      "start_time": 70,
+      "end_time": 78,
+      "text": "Napisałem własny planer w Pythonie. Sprawdza dalsze postoje konkretnego pociągu.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-11",
+      "scene_id": "scene-3",
+      "start_time": 78,
+      "end_time": 85,
+      "text": "Porównuje zatwierdzone przejścia i dokładne słupki ZTM. Potem sprawdza dalszą trasę wybranego autobusu.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-12",
+      "scene_id": "scene-3",
+      "start_time": 85,
+      "end_time": 92,
+      "text": "Cel musi występować na tym samym kursie, po przystanku wejścia.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-13",
+      "scene_id": "scene-3",
+      "start_time": 92,
+      "end_time": 99,
+      "text": "Planer uwzględnia dojście i oblicza zapas. Preferuje warianty z zapasem co najmniej dwóch minut.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-14",
+      "scene_id": "scene-3",
+      "start_time": 99,
+      "end_time": 105,
+      "text": "W tej grupie liczy się czas dotarcia do celu.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-15",
+      "scene_id": "scene-4",
+      "start_time": 105,
+      "end_time": 112,
+      "text": "React i TypeScript odpowiadają za interfejs. FastAPI udostępnia REST API i waliduje dane.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-16",
+      "scene_id": "scene-4",
+      "start_time": 112,
+      "end_time": 119,
+      "text": "Samą ocenę zapasu wydzieliłem do czystej funkcji. Mogę testować ją bez serwera i bazy.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-17",
+      "scene_id": "scene-4",
+      "start_time": 119,
+      "end_time": 126,
+      "text": "Rozkłady SKM i ZTM importuję z oficjalnych plików GTFS do lokalnego SQLite.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-18",
+      "scene_id": "scene-4",
+      "start_time": 126,
+      "end_time": 133,
+      "text": "Dojście pochodzi z cache OpenRouteService. Suwak nie odpytuje tej usługi.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-19",
+      "scene_id": "scene-4",
+      "start_time": 133,
+      "end_time": 140,
+      "text": "Szacunek zaokrąglam w górę do minut. Nieaktualny wpis wyklucza przejście.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-20",
+      "scene_id": "scene-5",
+      "start_time": 140,
+      "end_time": 148,
+      "text": "Testuję backend, frontend i przeglądarkę, także kalendarze, północ i zmianę czasu.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-21",
+      "scene_id": "scene-5",
+      "start_time": 148,
+      "end_time": 157,
+      "text": "MVP porównuje cztery zatwierdzone przejścia przy Gdańsku Głównym. Nie jest pełnym planerem Trójmiasta.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    },
+    {
+      "segment_id": "seg-22",
+      "scene_id": "scene-5",
+      "start_time": 157,
+      "end_time": 165,
+      "text": "To dane archiwalne, bez rzeczywistych opóźnień. Dojście pozostaje szacunkiem, a nie zweryfikowanym czasem od peronu.",
+      "pause_after_ms": 250,
+      "pronunciation_notes": null
+    }
+  ],
+  "editorial": {
+    "skill": "humanizer",
+    "version": "4.0.0",
+    "scope": "Narracja, napisy i etykiety diagramów; fact-check po redakcji.",
+    "tts_generated": false
+  },
+  "graphics": {
+    "algorithm_title": "Jak wybierana jest podróż",
+    "architecture_title": "Obliczenia i dane",
+    "tests_title": "Sprawdzone w testach"
+  }
+}

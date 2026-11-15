@@ -1,146 +1,115 @@
 # Przesiadka+
 
-A local MVP for checking whether a public transport transfer in Gdańsk remains reachable when the arriving service is delayed. It compares scheduled times, walking time and a simulated delay, then identifies a later departure when the original connection is missed.
-
-The interface is in Polish. Quiet Precision combines large departure times, an interactive timeline and a pixel-art status face.
+A local full-stack application for planning an SKM train ride and a ZTM connection in Gdańsk. It selects an interchange, includes estimated walking time and shows how a simulated train delay changes the transfer margin.
 
 ## Demo
 
-Start both services and choose an example under **Wypróbuj przykład**. Move the delay slider to update the margin, status, timeline and Plan B.
+[Watch the demo with Polish narration and captions (MP4, 2:45)](demo-video/final/przesiadka-demo-ai-voice.mp4)
 
-| Example | Schedule | Try |
-| --- | --- | --- |
-| **Spokojna przesiadka** | Arrival 17:42, departure 17:51, walking 3 min, next departure 18:03 | Delays of 0, 6 and 8 min give margins of +6, 0 and −2 min. At 8 min, Plan B is 18:03. |
-| **Przesiadka na styk** | Arrival 17:48, departure 17:52, walking 3 min, next departure 18:04 | Delays of 0, 1 and 2 min show a reachable, just-in-time and missed connection. |
-| **Ostatni kurs** | Arrival 23:58, departure 00:04 the following day, walking 3 min, no later departure | A 4 min delay misses the connection and leaves no alternative. |
-
-These are **fictional demonstration scenarios**, fixed to 10–11 November 2026 in `Europe/Warsaw`. They are not current transport timetables. Examples use the real evaluation API without being saved to SQLite. **Wróć do swoich scenariuszy** returns to the previously selected saved scenario.
-
-### Screenshots
-
-Real captures have not yet been added to this repository. Reserved screenshot slots:
-
-- [ ] Desktop: transfer analysis with an 8 min delay and Plan B at 18:03.
-- [ ] Mobile: the shared arrival/departure point at zero margin.
-- [ ] Midnight: the last-course example with no alternative.
+The film records the working Kinetic Transit interface using archival timetables from 13 November 2026. [Production scripts and storyboard](demo-video/README.md) are included.
 
 ## Features
 
-- Create, list, select, edit and delete scenarios, with deletion confirmation and persistent local storage.
-- Enter dates through calendar controls and times as HH:MM, including an explicit choice for repeated DST hours.
-- Simulate arrival delay and inspect the transfer margin and zero-delay threshold.
-- Show reachable, just-in-time and missed states, with Plan B or an explicit unavailable state.
-- Inspect timeline events for full dates and offsets; coincident events share one point, while nearby events remain distinct.
-- Use the responsive interface with loading, empty and error states, keyboard controls and reduced-motion support.
+- Choose an SKM origin, departure date/time and ZTM destination.
+- Find connections through approved walking links and exact ZTM boarding stops.
+- Compare up to three journeys, including destination arrival times.
+- Inspect estimated walking time and the remaining transfer margin.
+- Simulate 0 to 30 minutes of delay for the selected courses.
+- Follow the result through animated SVG figures and a responsive, keyboard-accessible Polish interface.
 
 ## Tech Stack
 
-| Layer | Technologies |
-| --- | --- |
-| Backend | Python 3.13, FastAPI, Pydantic, SQLModel, SQLite, Uvicorn, `zoneinfo` and `tzdata` |
-| Frontend | React 19, TypeScript, Vite, CSS Modules, native SVG and browser `Intl` APIs |
-| Tooling and tests | uv with `uv.lock`; npm with `package-lock.json`; pytest, HTTPX/TestClient and Node's built-in test runner |
+| Area | Technologies |
+|---|---|
+| Frontend | React, TypeScript, Vite, CSS Modules, SVG/SMIL |
+| Backend | Python 3.13, FastAPI, Pydantic, uvicorn; dependencies managed with uv |
+| Database | SQLite through Python's `sqlite3` |
+| Transit data | Locally imported SKM and ZTM Gdańsk GTFS |
+| Walking estimates | Saved directional OpenRouteService routes |
+| Testing | pytest/httpx, Node test runner, Playwright with Edge |
 
-## Architecture
+## How It Works
 
-- [Transfer logic](backend/app/transfer_logic.py) is a pure function with no HTTP or database dependencies.
-- [The FastAPI application](backend/app/main.py) registers CRUD and evaluation routes. SQLModel stores scenarios in `backend/data/scenarios.db`, created on startup. `PRZESIADKA_DATABASE_PATH` can override that location.
-- [TransferAnalysis](frontend/src/TransferAnalysis.tsx) sends time inputs to `POST /api/transfers/evaluate`. The frontend presents the response rather than calculating transfer outcomes.
-- [Demo examples](frontend/src/demoExamples.ts) contain fixed inputs without database identifiers. Selecting one reuses the analysis component and does not call the CRUD write endpoints.
+The backend follows later stops of each candidate SKM trip and checks approved walking links to concrete ZTM stops. A connecting bus or tram must reach the destination later on that same trip. Walking estimates come from the local ORS cache and are rounded up to whole minutes.
 
-### API
+Within a six-hour search window, ranking prefers at least two minutes of transfer margin, then earlier destination arrival, shorter journey duration and less waiting. The current registry contains four directional links at Gdańsk Główny.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/api/health` | Return `{"status":"ok"}`. |
-| GET | `/api/scenarios` | List saved scenarios. |
-| GET | `/api/scenarios/{scenario_id}` | Read one scenario. |
-| POST | `/api/scenarios` | Create a scenario; return HTTP 201. |
-| PUT | `/api/scenarios/{scenario_id}` | Replace all editable scenario fields. |
-| DELETE | `/api/scenarios/{scenario_id}` | Delete a scenario; return HTTP 204. |
-| POST | `/api/transfers/evaluate` | Evaluate supplied times without reading or writing scenarios. |
-
-Evaluation accepts `arrival_at`, `departure_at`, `walking_minutes`, `delay_minutes` and `next_departures`. The response includes the margin, delay threshold, status, expected arrival at the stop and Plan B state. Invalid inputs return HTTP 422; missing scenarios return HTTP 404.
+A pure Python function calculates `margin = departure - (arrival + walking + delay)`, comparing UTC instants across midnight and Warsaw DST changes. The slider evaluates the same courses with a simulated delay. Request cancellation and response identity checks protect the UI against stale results. [Planner details](docs/journey-planner.md).
 
 ## Getting Started
 
-### Prerequisites
+### Prerequisites and installation
 
-- Windows PowerShell with Python 3.13 and uv available on `PATH`.
-- Node.js 24.x and npm. Frontend tests use Node's native TypeScript support.
-- A modern browser and free local ports 8000 and 5173.
-
-Run each block from the repository root in a separate PowerShell terminal. `npm.cmd` avoids PowerShell execution-policy issues with the npm script wrapper.
-
-### Backend
+Use Windows PowerShell with Git, Python 3.13, uv, Node.js 24+ and npm installed.
 
 ```powershell
-Set-Location .\backend
-uv sync --locked
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+git clone --branch feature/gtfs-integration https://github.com/Weisjan/Przesiadka-.git PrzesiadkaPlus
+Set-Location .\PrzesiadkaPlus
+uv sync --locked --directory backend
+npm.cmd ci --prefix frontend
 ```
 
-No manual database setup, accounts or API keys are required. Saved scenarios remain in SQLite after the backend restarts.
+Run all following commands from this repository root. The frontend's `package.json` is in `frontend/`.
 
-### Frontend
+### Prepare local data
+
+Import both official static timetables:
 
 ```powershell
-Set-Location .\frontend
-npm.cmd ci
-npm.cmd run dev
+uv run --no-sync --directory backend python -m app.gtfs ztm
+uv run --no-sync --directory backend python -m app.gtfs skm
 ```
 
-| Service | Address |
-| --- | --- |
-| Application | <http://127.0.0.1:5173> |
-| API health | <http://127.0.0.1:8000/api/health> |
-| OpenAPI schema | <http://127.0.0.1:8000/openapi.json> |
+These commands download and import the feeds into `backend/data/gtfs/transit.db`. With an ORS key supplied through the process environment variable `ORS_API_KEY`, preview and calculate one supported walking link:
 
-Swagger UI (`/docs`) and ReDoc (`/redoc`) are disabled. The OpenAPI JSON is the available API reference. Stop each service with `Ctrl+C`.
+```powershell
+uv run --no-sync --directory backend python -m app.walking skm:7500 ztm:2001 --dry-run
+uv run --no-sync --directory backend python -m app.walking skm:7500 ztm:2001 --max-requests 1
+```
+
+The second command contacts ORS and saves the estimate in `backend/data/walking.db`. Search uses the approved links with valid cached estimates. [GTFS imports](docs/gtfs.md) and [walking-cache setup](docs/walking.md) document paths, attribution and controlled imports for further pairs. Keep keys and provider databases local.
+
+### Start the application
+
+Start the API:
+
+```powershell
+uv run --no-sync --directory backend uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+In a second PowerShell terminal at the repository root, start the frontend:
+
+```powershell
+npm.cmd run dev --prefix frontend
+```
+
+Open <http://127.0.0.1:5173>. API health is at <http://127.0.0.1:8000/api/health> and its schema at <http://127.0.0.1:8000/openapi.json>. Stop servers with Ctrl+C.
+
+### Historical presentation mode
+
+The recorded examples use `backend/data/demo/transit.db`, `walking.db` and `manifest.json`. This local bundle is excluded from Git. Rebuilding it with `app.demo prepare` requires existing official imports covering 13 November 2026 and the saved walking estimates; current feeds may cover different dates. [Demo preparation and provenance](docs/demo.md).
+
+With the bundle present, use this command instead of the regular API command:
+
+```powershell
+uv run --no-sync --directory backend python -m app.demo serve
+```
+
+Use the same frontend command. The archival banner identifies this mode. **Zobacz przykład** runs the planner for Wrzeszcz to Strzyża PKM, Lawendowe Wzgórze or Przegalina. Departure searches cover 13 November 2026, 16:00 to 18:00; delays remain simulated.
 
 ## Testing
 
-Run these blocks from the repository root after installing the existing dependencies.
-
-Backend tests use isolated temporary SQLite databases. A unique temporary directory also avoids conflicts with earlier pytest runs:
+From the repository root:
 
 ```powershell
-Set-Location .\backend
-$testTemp = Join-Path $env:TEMP ("przesiadka-tests-" + [guid]::NewGuid().ToString())
-uv run python -m pytest --basetemp $testTemp
+uv run --no-sync --directory backend python -m pytest -q
+npm.cmd test --prefix frontend
+npm.cmd run typecheck --prefix frontend
+npm.cmd run build --prefix frontend
 ```
 
-Coverage includes CRUD, validation, persistence across application restarts, CORS, transfer boundaries, DST, midnight and evaluation without database access.
+Tests use temporary databases and synthetic provider fixtures. The [browser suite](frontend/tests/stop_selection_browser.py) checks interaction, stale responses, responsive layout and SVG motion using an existing Playwright/Edge installation.
 
-```powershell
-Set-Location .\frontend
-npm.cmd test
-npm.cmd run typecheck
-npm.cmd run build
-```
+## AI-Assisted Development
 
-Frontend unit tests cover Warsaw time conversion, fixed demo inputs, timeline event grouping, close timestamps and API response validation. The build script also runs the typecheck. There is no committed browser end-to-end suite.
-
-## Engineering Decisions
-
-- **Time handling:** API inputs require full ISO 8601 dates with offsets valid for `Europe/Warsaw`. The form rejects nonexistent spring-transition times and asks which occurrence to use during the autumn overlap. SQLite stores ISO strings to preserve offsets.
-- **Elapsed time:** the backend converts inputs to UTC before arithmetic and comparisons. Full dates handle midnight and DST without comparing clock times alone.
-- **Transfer boundaries:** `margin = departure − (arrival + delay + walking)`. Positive means `Zdążysz`, zero means `Na styk`, and negative means `Nie zdążysz`. The threshold is the margin at zero delay; non-positive thresholds indicate no safe initial margin.
-- **Plan B:** only a missed connection needs an alternative. The backend chooses the earliest supplied later departure at or after the expected arrival at the stop. Candidates must belong to the same departing line and direction; the application does not search a transport network.
-- **Asynchronous UI:** analysis requests are debounced by 150 ms. Cleanup aborts superseded requests, and a disposal guard ignores late responses. Results are matched to the current scenario, delay and retry attempt.
-- **Accessibility:** labeled native controls, modal focus handling, visible keyboard focus and live status text accompany the visual result. Color is not the only status cue. CSS respects `prefers-reduced-motion`.
-
-## Limitations
-
-- No live transport feeds, route discovery or timetable verification. All calculations depend on supplied schedules and walking times.
-- Outcomes are deterministic time comparisons, not probability estimates or guarantees that a connection will be held.
-- Local, unauthenticated MVP: no user accounts, access control or production deployment setup. The frontend API origin is fixed to `http://127.0.0.1:8000`; CORS allows only the two configured localhost origins on port 5173.
-- SQLite tables are created automatically, but schema migrations are not implemented. Saved scenarios accept at most 100 strictly increasing later departures and an integer walking time from 0 to 1440 min.
-
-## Future Improvements
-
-Not implemented:
-
-- Commit browser end-to-end tests and add CI checks.
-- Add versioned database migrations and scenario import/export.
-- Support timetable-file imports with an explicit source and validity period.
+OpenAI Codex supported implementation, tests, refactoring and browser/video automation. I defined the product flow, technical constraints and visual direction, reviewed changes and used tests to verify behaviour. The [agent instructions](AGENTS.md) and [project skills](.agents/skills) are versioned. Humanizer 4.0.0 helped edit README prose, film narration and captions; Playwright and FFmpeg automated the recording and montage.

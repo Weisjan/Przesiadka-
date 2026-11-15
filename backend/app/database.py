@@ -1,9 +1,6 @@
-from collections.abc import Iterator
-
-from fastapi import Request
-from sqlmodel import Session
+from pathlib import Path
 
 
-def get_session(request: Request) -> Iterator[Session]:
-    with Session(request.app.state.engine) as session:
-        yield session
+def validate_database_paths(transit: Path, walking: Path) -> None:
+    if transit == walking or (transit.exists() and walking.exists() and transit.samefile(walking)):
+        raise ValueError("Bazy GTFS i walking muszą mieć osobne pliki. Sprawdź konfigurację ścieżek.")
